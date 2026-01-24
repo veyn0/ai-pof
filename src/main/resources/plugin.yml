@@ -2,3 +2,11 @@ name: ai-pof
 version: '1.0-SNAPSHOT'
 main: dev.veyno.aiPof.AiPof
 api-version: '1.21'
+commands:
+  pof:
+    description: Pillars of Fortune
+    usage: /pof <create|join|leave|start|status>
+permissions:
+  pof.admin:
+    description: Darf Runden erstellen und starten
+    default: op
