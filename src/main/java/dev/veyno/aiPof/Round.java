@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -15,6 +16,7 @@ import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
 import org.bukkit.GameMode;
+import org.bukkit.GameRule;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -43,7 +45,7 @@ public class Round {
     public Round(AiPof plugin) {
         this.plugin = plugin;
         this.worldName = "pof_round_" + System.currentTimeMillis();
-        this.itemPool = Material.values().stream()
+        this.itemPool = Arrays.stream(Material.values())
             .filter(Material::isItem)
             .filter(material -> material != Material.AIR)
             .collect(Collectors.toCollection(ArrayList::new));
@@ -58,8 +60,8 @@ public class Round {
             throw new IllegalStateException("Konnte Welt nicht erstellen.");
         }
         world.setDifficulty(Difficulty.EASY);
-        world.setGameRuleValue("doDaylightCycle", "false");
-        world.setGameRuleValue("doWeatherCycle", "false");
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
         world.setTime(6000);
         int pillarHeight = plugin.getConfig().getInt("pillar-height", 64);
         waitingSpawn = new Location(world, 0.5, pillarHeight + 6, 0.5);
