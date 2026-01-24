@@ -1,0 +1,5 @@
+min-players: 2
+start-countdown-seconds: 10
+item-interval-seconds: 10
+pillar-height: 64
+pillar-spacing: 6
