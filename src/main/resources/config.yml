@@ -3,3 +3,7 @@ start-countdown-seconds: 10
 item-interval-seconds: 10
 pillar-height: 64
 pillar-spacing: 6
+item-count:
+  enabled: true
+  max: 3
+  base-weight: 1.0

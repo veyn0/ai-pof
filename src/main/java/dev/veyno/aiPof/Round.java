@@ -346,12 +346,34 @@ public class Round {
                     continue;
                 }
                 Material material = itemPool.get(random.nextInt(itemPool.size()));
-                ItemStack stack = new ItemStack(material, 1);
+                int count = rollItemCount();
+                ItemStack stack = new ItemStack(material, count);
                 Map<Integer, ItemStack> leftover = player.getInventory().addItem(stack);
                 leftover.values().forEach(item -> world.dropItemNaturally(player.getLocation(), item));
             }
             checkForWinner();
         }, 20L * intervalSeconds, 20L * intervalSeconds);
+    }
+
+    private int rollItemCount() {
+        if (!plugin.getConfig().getBoolean("item-count.enabled", true)) {
+            return 1;
+        }
+        int max = Math.max(1, plugin.getConfig().getInt("item-count.max", 1));
+        double baseWeight = plugin.getConfig().getDouble("item-count.base-weight", 1.0);
+        double totalWeight = 0.0;
+        for (int count = 1; count <= max; count++) {
+            totalWeight += baseWeight / (count * count);
+        }
+        double roll = random.nextDouble() * totalWeight;
+        double running = 0.0;
+        for (int count = 1; count <= max; count++) {
+            running += baseWeight / (count * count);
+            if (roll <= running) {
+                return count;
+            }
+        }
+        return 1;
     }
 
     private void broadcast(String message) {
