@@ -281,9 +281,9 @@ public class Round {
         }
         for (UUID uuid : participants) {
             Player player = Bukkit.getPlayer(uuid);
-            Location spawn = waitingBoxSpawns.get(uuid);
-            if (player != null && spawn != null) {
-                player.teleport(spawn);
+            Location spawn1 = waitingBoxSpawns.get(uuid);
+            if (player != null && spawn1 != null) {
+                player.teleport(spawn1);
             }
         }
     }
