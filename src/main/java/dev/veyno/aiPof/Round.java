@@ -33,6 +33,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.util.BoundingBox;
 
 public class Round {
+    public static final String WORLD_PREFIX = "pof_round_";
     private final AiPof plugin;
     private final String worldName;
     private final Random random = new Random();
@@ -53,7 +54,7 @@ public class Round {
     public Round(AiPof plugin, Consumer<Round> endListener) {
         this.plugin = plugin;
         this.endListener = endListener;
-        this.worldName = "pof_round_" + System.currentTimeMillis();
+        this.worldName = WORLD_PREFIX + System.currentTimeMillis();
         this.itemPool = Arrays.stream(Material.values())
             .filter(Material::isItem)
             .filter(material -> material != Material.AIR)

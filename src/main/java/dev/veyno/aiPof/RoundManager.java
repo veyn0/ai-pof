@@ -1,11 +1,16 @@
 package dev.veyno.aiPof;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -82,6 +87,35 @@ public class RoundManager implements Listener {
         }
         round.addPlayer(player);
         playerRounds.put(player.getUniqueId(), roundId);
+    }
+
+    public int cleanupUnusedWorldFolders() {
+        File container = Bukkit.getWorldContainer();
+        File[] folders = container.listFiles(File::isDirectory);
+        if (folders == null) {
+            return 0;
+        }
+        Set<String> activeWorlds = rounds.values().stream()
+            .map(Round::getWorld)
+            .filter(Objects::nonNull)
+            .map(World::getName)
+            .collect(Collectors.toSet());
+        Set<String> loadedWorlds = Bukkit.getWorlds().stream()
+            .map(World::getName)
+            .collect(Collectors.toSet());
+        int deleted = 0;
+        for (File folder : folders) {
+            String name = folder.getName();
+            if (!name.startsWith(Round.WORLD_PREFIX)) {
+                continue;
+            }
+            if (activeWorlds.contains(name) || loadedWorlds.contains(name)) {
+                continue;
+            }
+            deleteWorldFolder(folder);
+            deleted++;
+        }
+        return deleted;
     }
 
     public void leave(Player player) {
@@ -252,5 +286,22 @@ public class RoundManager implements Listener {
             }
         }
         return null;
+    }
+
+    private void deleteWorldFolder(File folder) {
+        if (folder == null || !folder.exists()) {
+            return;
+        }
+        try {
+            Files.walk(folder.toPath())
+                .sorted((a, b) -> b.compareTo(a))
+                .forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException ignored) {
+                    }
+                });
+        } catch (IOException ignored) {
+        }
     }
 }

@@ -43,6 +43,8 @@ messages:
   help-start: "<yellow>/pof start <id></yellow> <gray>- Runde sofort starten</gray>"
   help-status: "<yellow>/pof status <id></yellow> <gray>- Rundenstatus anzeigen</gray>"
   help-list: "<yellow>/pof list</yellow> <gray>- Aktive Runden anzeigen</gray>"
+  help-cleanup: "<yellow>/pof cleanup</yellow> <gray>- Unbenutzte Runden-Welten löschen</gray>"
+  cleanup-done: "<green>Unbenutzte Welten gelöscht:</green> <yellow>{count}</yellow>"
   already-waiting: "<yellow>Du bist bereits im Wartebereich.</yellow>"
   joined: "<green>Du bist dem Wartebereich beigetreten.</green>"
   left: "<yellow>Du hast die Runde verlassen.</yellow>"

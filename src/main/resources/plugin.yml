@@ -5,7 +5,7 @@ api-version: '1.21'
 commands:
   pof:
     description: Pillars of Fortune
-    usage: /pof <create|join|leave|start|status>
+    usage: /pof <create|join|leave|start|status|list|cleanup>
 permissions:
   pof.admin:
     description: Darf Runden erstellen und starten
