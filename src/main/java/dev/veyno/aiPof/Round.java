@@ -157,14 +157,17 @@ public class Round {
 
     public void endRound(Player winner) {
         if (ended) {
+            cleanupWorld();
             return;
         }
         ended = true;
         if (itemTask != null) {
             itemTask.cancel();
+            itemTask = null;
         }
         if (countdownTask != null) {
             countdownTask.cancel();
+            countdownTask = null;
         }
         if (winner != null) {
             broadcast("§a" + winner.getName() + " hat die Runde gewonnen!");
@@ -186,10 +189,10 @@ public class Round {
         participants.clear();
         alivePlayers.clear();
         pillarAssignments.clear();
-        Bukkit.getScheduler().runTaskLater(plugin, this::cleanupWorld, 20L);
+        cleanupWorld();
     }
 
-    private void cleanupWorld() {
+    void cleanupWorld() {
         if (world == null) {
             return;
         }
@@ -197,6 +200,7 @@ public class Round {
         Bukkit.unloadWorld(world, false);
         File folder = new File(Bukkit.getWorldContainer(), name);
         deleteWorldFolder(folder);
+        world = null;
     }
 
     private void deleteWorldFolder(File folder) {
