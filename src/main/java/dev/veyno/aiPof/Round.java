@@ -150,7 +150,7 @@ public class Round {
             countdownTask = null;
         }
         buildPillars();
-        buildWaitingBoxes();
+        buildStartBoxes();
         for (UUID uuid : participants) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
@@ -163,10 +163,15 @@ public class Round {
                 if (spawn != null) {
                     player.teleport(spawn);
                 }
-                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 20 * 10, 0, true, false, true));
             }
         }
         clearWaitingBoxes();
+        for (UUID uuid : participants) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 20 * 10, 0, true, false, true));
+            }
+        }
         scheduleItemDropsWithDelay();
         broadcast("round-started");
     }
@@ -256,37 +261,61 @@ public class Round {
     private void buildWaitingBoxes() {
         clearWaitingBoxes();
         waitingBoxSpawns.clear();
+        if (participants.isEmpty()) {
+            return;
+        }
+        int pillarHeight = plugin.getConfig().getInt("pillar-height", 64);
+        int radius = plugin.getConfig().getInt("waiting-box.radius", 6);
+        int height = plugin.getConfig().getInt("waiting-box.height", 3);
+        int yOffset = plugin.getConfig().getInt("waiting-box.y-offset", 4);
+        int centerX = plugin.getConfig().getInt("waiting-box.center-x", 0);
+        int centerZ = plugin.getConfig().getInt("waiting-box.center-z", 0);
+        int minX = centerX - radius;
+        int maxX = centerX + radius;
+        int minZ = centerZ - radius;
+        int maxZ = centerZ + radius;
+        int minY = pillarHeight + yOffset;
+        int maxY = minY + height + 1;
+        buildGlassBox(minX, maxX, minY, maxY, minZ, maxZ);
+        Location spawn = new Location(world, centerX + 0.5, minY + 1, centerZ + 0.5);
+        for (UUID uuid : participants) {
+            waitingBoxSpawns.put(uuid, spawn);
+        }
+        for (UUID uuid : participants) {
+            Player player = Bukkit.getPlayer(uuid);
+            Location spawn = waitingBoxSpawns.get(uuid);
+            if (player != null && spawn != null) {
+                player.teleport(spawn);
+            }
+        }
+    }
+
+    private void buildStartBoxes() {
+        clearWaitingBoxes();
+        waitingBoxSpawns.clear();
+        int pillarHeight = plugin.getConfig().getInt("pillar-height", 64);
+        int spacing = plugin.getConfig().getInt("pillar-spacing", 6);
+        int radius = plugin.getConfig().getInt("start-box.radius", 1);
+        int height = plugin.getConfig().getInt("start-box.height", 2);
+        int yOffset = plugin.getConfig().getInt("start-box.y-offset", 2);
         int count = participants.size();
         if (count == 0) {
             return;
         }
-        int height = plugin.getConfig().getInt("pillar-height", 64);
-        int spacing = plugin.getConfig().getInt("pillar-spacing", 6);
-        int baseY = height + 3;
         List<UUID> orderedParticipants = getOrderedParticipants();
         for (int index = 0; index < orderedParticipants.size(); index++) {
             UUID uuid = orderedParticipants.get(index);
             Location pillarLocation = getPillarLocation(index, count, spacing);
             int x = pillarLocation.getBlockX();
             int z = pillarLocation.getBlockZ();
-            int minX = x - 1;
-            int maxX = x + 1;
-            int minZ = z - 1;
-            int maxZ = z + 1;
-            int minY = baseY;
-            int maxY = baseY + 2;
-            WaitingBox box = new WaitingBox(minX, maxX, minY, maxY, minZ, maxZ);
-            waitingBoxes.add(box);
-            for (int bx = minX; bx <= maxX; bx++) {
-                for (int by = minY; by <= maxY; by++) {
-                    for (int bz = minZ; bz <= maxZ; bz++) {
-                        Block block = world.getBlockAt(bx, by, bz);
-                        boolean border = bx == minX || bx == maxX || by == minY || by == maxY || bz == minZ || bz == maxZ;
-                        block.setType(border ? Material.GLASS : Material.AIR);
-                    }
-                }
-            }
-            Location spawn = new Location(world, x + 0.5, baseY + 1, z + 0.5);
+            int minX = x - radius;
+            int maxX = x + radius;
+            int minZ = z - radius;
+            int maxZ = z + radius;
+            int minY = pillarHeight + yOffset;
+            int maxY = minY + height + 1;
+            buildGlassBox(minX, maxX, minY, maxY, minZ, maxZ);
+            Location spawn = new Location(world, x + 0.5, minY + 1, z + 0.5);
             waitingBoxSpawns.put(uuid, spawn);
         }
         for (UUID uuid : participants) {
@@ -312,6 +341,20 @@ public class Round {
             }
         }
         waitingBoxes.clear();
+    }
+
+    private void buildGlassBox(int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
+        WaitingBox box = new WaitingBox(minX, maxX, minY, maxY, minZ, maxZ);
+        waitingBoxes.add(box);
+        for (int bx = minX; bx <= maxX; bx++) {
+            for (int by = minY; by <= maxY; by++) {
+                for (int bz = minZ; bz <= maxZ; bz++) {
+                    Block block = world.getBlockAt(bx, by, bz);
+                    boolean border = bx == minX || bx == maxX || by == minY || by == maxY || bz == minZ || bz == maxZ;
+                    block.setType(border ? Material.GLASS : Material.AIR);
+                }
+            }
+        }
     }
 
     private void maybeStartCountdown() {
