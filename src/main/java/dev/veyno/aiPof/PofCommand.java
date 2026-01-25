@@ -117,6 +117,14 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     plugin.sendMessage(sender, "list-entry", Map.of("id", id, "status", statusTemplate));
                 }
             }
+            case "cleanup" -> {
+                if (!sender.hasPermission("pof.admin")) {
+                    plugin.sendMessage(sender, "no-permission");
+                    return true;
+                }
+                int deleted = roundManager.cleanupUnusedWorldFolders();
+                plugin.sendMessage(sender, "cleanup-done", Map.of("count", Integer.toString(deleted)));
+            }
             default -> sendHelp(sender);
         }
         return true;
@@ -130,12 +138,13 @@ public class PofCommand implements CommandExecutor, TabCompleter {
         plugin.sendMessage(sender, "help-start");
         plugin.sendMessage(sender, "help-status");
         plugin.sendMessage(sender, "help-list");
+        plugin.sendMessage(sender, "help-cleanup");
     }
 
     @Override
     public List<String> onTabComplete(CommandSender sender, Command command, String alias, String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("create", "join", "leave", "start", "status", "list");
+            return Arrays.asList("create", "join", "leave", "start", "status", "list", "cleanup");
         }
         if (args.length == 2 && Arrays.asList("join", "leave", "start", "status").contains(args[0].toLowerCase())) {
             return new ArrayList<>(roundManager.getRoundIds());
