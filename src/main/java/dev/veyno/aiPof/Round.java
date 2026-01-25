@@ -87,6 +87,7 @@ public class Round {
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
         player.setGameMode(GameMode.SURVIVAL);
+        player.setInvulnerable(true);
         player.teleport(waitingSpawn);
         player.sendMessage("§aDu bist dem Wartebereich beigetreten.");
         maybeStartCountdown();
@@ -96,6 +97,7 @@ public class Round {
         participants.remove(player.getUniqueId());
         alivePlayers.remove(player.getUniqueId());
         pillarAssignments.remove(player.getUniqueId());
+        player.setInvulnerable(false);
         if (teleportOut) {
             World mainWorld = Bukkit.getWorlds().getFirst();
             player.teleport(mainWorld.getSpawnLocation());
@@ -162,6 +164,7 @@ public class Round {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 player.getInventory().clear();
+                player.setInvulnerable(false);
                 player.teleport(mainWorld.getSpawnLocation());
             }
         }
@@ -296,6 +299,7 @@ public class Round {
             Location spawn = new Location(world, x + 0.5, height + 1, z + 0.5);
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
+            player.setInvulnerable(false);
             index++;
         }
     }
