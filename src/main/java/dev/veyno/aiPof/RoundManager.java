@@ -11,6 +11,8 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
@@ -167,6 +169,28 @@ public class RoundManager implements Listener {
         }
     }
 
+    @EventHandler
+    public void onBlockBreak(BlockBreakEvent event) {
+        Round round = findRoundByWorld(event.getBlock().getWorld());
+        if (round == null) {
+            return;
+        }
+        if (round.isWaitingBoxBlock(event.getBlock())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler
+    public void onBlockPlace(BlockPlaceEvent event) {
+        Round round = findRoundByWorld(event.getBlock().getWorld());
+        if (round == null) {
+            return;
+        }
+        if (round.isWaitingBoxBlock(event.getBlock())) {
+            event.setCancelled(true);
+        }
+    }
+
     private void handleRoundEnded(Round round) {
         String roundId = findRoundId(round);
         if (roundId == null) {
@@ -213,6 +237,18 @@ public class RoundManager implements Listener {
         for (Map.Entry<String, Round> entry : rounds.entrySet()) {
             if (entry.getValue() == round) {
                 return entry.getKey();
+            }
+        }
+        return null;
+    }
+
+    private Round findRoundByWorld(World world) {
+        if (world == null) {
+            return null;
+        }
+        for (Round round : rounds.values()) {
+            if (world.equals(round.getWorld())) {
+                return round;
             }
         }
         return null;

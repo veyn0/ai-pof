@@ -26,7 +26,10 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
+import org.bukkit.util.BoundingBox;
 
 public class Round {
     private final AiPof plugin;
@@ -37,12 +40,11 @@ public class Round {
     private final Set<UUID> alivePlayers = new HashSet<>();
     private final Map<UUID, Integer> pillarAssignments = new HashMap<>();
     private final List<Material> itemPool;
+    private final Map<UUID, Location> waitingBoxSpawns = new HashMap<>();
+    private final List<WaitingBox> waitingBoxes = new ArrayList<>();
     private World world;
-    private Location waitingSpawn;
-    private Location waitingPlatformCenter;
-    private int waitingPlatformRadius;
-    private int waitingPlatformY;
     private BukkitTask itemTask;
+    private BukkitTask itemDelayTask;
     private BukkitTask countdownTask;
     private boolean started;
     private boolean ended;
@@ -74,9 +76,6 @@ public class Round {
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
         world.setTime(6000);
-        int pillarHeight = plugin.getConfig().getInt("pillar-height", 64);
-        waitingSpawn = new Location(world, 0.5, pillarHeight + 6, 0.5);
-        buildWaitingPlatform(pillarHeight + 5);
     }
 
     public void addPlayer(Player player) {
@@ -91,7 +90,11 @@ public class Round {
         player.setFoodLevel(20);
         player.setGameMode(GameMode.SURVIVAL);
         player.setInvulnerable(true);
-        player.teleport(waitingSpawn);
+        buildWaitingBoxes();
+        Location spawn = waitingBoxSpawns.get(player.getUniqueId());
+        if (spawn != null) {
+            player.teleport(spawn);
+        }
         player.sendMessage("§aDu bist dem Wartebereich beigetreten.");
         maybeStartCountdown();
     }
@@ -101,6 +104,9 @@ public class Round {
         alivePlayers.remove(player.getUniqueId());
         pillarAssignments.remove(player.getUniqueId());
         player.setInvulnerable(false);
+        if (!started) {
+            buildWaitingBoxes();
+        }
         if (teleportOut) {
             World mainWorld = Bukkit.getWorlds().getFirst();
             player.teleport(mainWorld.getSpawnLocation());
@@ -141,17 +147,24 @@ public class Round {
             countdownTask = null;
         }
         buildPillars();
+        buildWaitingBoxes();
         for (UUID uuid : participants) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 player.setHealth(player.getMaxHealth());
                 player.setFoodLevel(20);
                 player.setSaturation(20f);
+                player.setGameMode(GameMode.SURVIVAL);
+                player.setInvulnerable(false);
+                Location spawn = waitingBoxSpawns.get(uuid);
+                if (spawn != null) {
+                    player.teleport(spawn);
+                }
+                player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 20 * 10, 0, true, false, true));
             }
         }
-        teleportPlayersToPillars();
-        clearWaitingPlatform();
-        scheduleItemDrops();
+        clearWaitingBoxes();
+        scheduleItemDropsWithDelay();
         broadcast("§6Pillars of Fortune gestartet! Viel Glück.");
     }
 
@@ -164,6 +177,10 @@ public class Round {
         if (itemTask != null) {
             itemTask.cancel();
             itemTask = null;
+        }
+        if (itemDelayTask != null) {
+            itemDelayTask.cancel();
+            itemDelayTask = null;
         }
         if (countdownTask != null) {
             countdownTask.cancel();
@@ -233,30 +250,65 @@ public class Round {
         }
     }
 
-    private void buildWaitingPlatform(int y) {
-        waitingPlatformRadius = 3;
-        waitingPlatformY = y;
-        waitingPlatformCenter = new Location(world, 0, y, 0);
-        for (int x = -waitingPlatformRadius; x <= waitingPlatformRadius; x++) {
-            for (int z = -waitingPlatformRadius; z <= waitingPlatformRadius; z++) {
-                Block block = world.getBlockAt(x, y, z);
-                block.setType(Material.SMOOTH_STONE);
+    private void buildWaitingBoxes() {
+        clearWaitingBoxes();
+        waitingBoxSpawns.clear();
+        int count = participants.size();
+        if (count == 0) {
+            return;
+        }
+        int height = plugin.getConfig().getInt("pillar-height", 64);
+        int spacing = plugin.getConfig().getInt("pillar-spacing", 6);
+        int baseY = height + 3;
+        List<UUID> orderedParticipants = getOrderedParticipants();
+        for (int index = 0; index < orderedParticipants.size(); index++) {
+            UUID uuid = orderedParticipants.get(index);
+            Location pillarLocation = getPillarLocation(index, count, spacing);
+            int x = pillarLocation.getBlockX();
+            int z = pillarLocation.getBlockZ();
+            int minX = x - 1;
+            int maxX = x + 1;
+            int minZ = z - 1;
+            int maxZ = z + 1;
+            int minY = baseY;
+            int maxY = baseY + 2;
+            WaitingBox box = new WaitingBox(minX, maxX, minY, maxY, minZ, maxZ);
+            waitingBoxes.add(box);
+            for (int bx = minX; bx <= maxX; bx++) {
+                for (int by = minY; by <= maxY; by++) {
+                    for (int bz = minZ; bz <= maxZ; bz++) {
+                        Block block = world.getBlockAt(bx, by, bz);
+                        boolean border = bx == minX || bx == maxX || by == minY || by == maxY || bz == minZ || bz == maxZ;
+                        block.setType(border ? Material.GLASS : Material.AIR);
+                    }
+                }
+            }
+            Location spawn = new Location(world, x + 0.5, baseY + 1, z + 0.5);
+            waitingBoxSpawns.put(uuid, spawn);
+        }
+        for (UUID uuid : participants) {
+            Player player = Bukkit.getPlayer(uuid);
+            Location spawn = waitingBoxSpawns.get(uuid);
+            if (player != null && spawn != null) {
+                player.teleport(spawn);
             }
         }
     }
 
-    private void clearWaitingPlatform() {
-        if (waitingPlatformCenter == null) {
+    private void clearWaitingBoxes() {
+        if (waitingBoxes.isEmpty()) {
             return;
         }
-        int centerX = waitingPlatformCenter.getBlockX();
-        int centerZ = waitingPlatformCenter.getBlockZ();
-        for (int x = -waitingPlatformRadius; x <= waitingPlatformRadius; x++) {
-            for (int z = -waitingPlatformRadius; z <= waitingPlatformRadius; z++) {
-                Block block = world.getBlockAt(centerX + x, waitingPlatformY, centerZ + z);
-                block.setType(Material.AIR);
+        for (WaitingBox box : waitingBoxes) {
+            for (int bx = box.minX(); bx <= box.maxX(); bx++) {
+                for (int by = box.minY(); by <= box.maxY(); by++) {
+                    for (int bz = box.minZ(); bz <= box.maxZ(); bz++) {
+                        world.getBlockAt(bx, by, bz).setType(Material.AIR);
+                    }
+                }
             }
         }
+        waitingBoxes.clear();
     }
 
     private void maybeStartCountdown() {
@@ -295,19 +347,16 @@ public class Round {
         if (count == 0) {
             return;
         }
-        double circumference = count * spacing;
-        double radius = Math.max(spacing, circumference / (2 * Math.PI));
-        double angleStep = (2 * Math.PI) / count;
-        int index = 0;
-        for (UUID uuid : participants) {
-            double angle = angleStep * index;
-            int x = (int) Math.round(Math.cos(angle) * radius);
-            int z = (int) Math.round(Math.sin(angle) * radius);
+        List<UUID> orderedParticipants = getOrderedParticipants();
+        for (int index = 0; index < orderedParticipants.size(); index++) {
+            UUID uuid = orderedParticipants.get(index);
+            Location pillarLocation = getPillarLocation(index, count, spacing);
+            int x = pillarLocation.getBlockX();
+            int z = pillarLocation.getBlockZ();
             for (int y = 0; y <= height; y++) {
                 world.getBlockAt(x, y, z).setType(Material.BEDROCK);
             }
             pillarAssignments.put(uuid, index);
-            index++;
         }
     }
 
@@ -315,25 +364,42 @@ public class Round {
         int height = plugin.getConfig().getInt("pillar-height", 64);
         int spacing = plugin.getConfig().getInt("pillar-spacing", 6);
         int count = participants.size();
-        double circumference = count * spacing;
-        double radius = Math.max(spacing, circumference / (2 * Math.PI));
-        double angleStep = (2 * Math.PI) / count;
-        int index = 0;
-        for (UUID uuid : participants) {
+        List<UUID> orderedParticipants = getOrderedParticipants();
+        for (int index = 0; index < orderedParticipants.size(); index++) {
+            UUID uuid = orderedParticipants.get(index);
             Player player = Bukkit.getPlayer(uuid);
             if (player == null) {
-                index++;
                 continue;
             }
-            double angle = angleStep * index;
-            int x = (int) Math.round(Math.cos(angle) * radius);
-            int z = (int) Math.round(Math.sin(angle) * radius);
+            Location pillarLocation = getPillarLocation(index, count, spacing);
+            int x = pillarLocation.getBlockX();
+            int z = pillarLocation.getBlockZ();
             Location spawn = new Location(world, x + 0.5, height + 1, z + 0.5);
             player.teleport(spawn);
             player.setGameMode(GameMode.SURVIVAL);
             player.setInvulnerable(false);
-            index++;
         }
+    }
+
+    private List<UUID> getOrderedParticipants() {
+        return participants.stream().sorted().toList();
+    }
+
+    private Location getPillarLocation(int index, int count, int spacing) {
+        double circumference = count * spacing;
+        double radius = Math.max(spacing, circumference / (2 * Math.PI));
+        double angleStep = (2 * Math.PI) / count;
+        double angle = angleStep * index;
+        int x = (int) Math.round(Math.cos(angle) * radius);
+        int z = (int) Math.round(Math.sin(angle) * radius);
+        return new Location(world, x, 0, z);
+    }
+
+    private void scheduleItemDropsWithDelay() {
+        if (itemDelayTask != null) {
+            itemDelayTask.cancel();
+        }
+        itemDelayTask = Bukkit.getScheduler().runTaskLater(plugin, this::scheduleItemDrops, 20L * 5);
     }
 
     private void scheduleItemDrops() {
@@ -403,5 +469,23 @@ public class Round {
 
     public World getWorld() {
         return world;
+    }
+
+    public boolean isWaitingBoxBlock(Block block) {
+        if (block == null || world == null || !block.getWorld().equals(world)) {
+            return false;
+        }
+        for (WaitingBox box : waitingBoxes) {
+            if (box.boundingBox().contains(block.getX(), block.getY(), block.getZ())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private record WaitingBox(int minX, int maxX, int minY, int maxY, int minZ, int maxZ) {
+        BoundingBox boundingBox() {
+            return new BoundingBox(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1);
+        }
     }
 }
