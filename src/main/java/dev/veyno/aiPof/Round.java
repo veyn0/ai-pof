@@ -22,9 +22,9 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
-import org.bukkit.WorldType;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
+import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.scheduler.BukkitTask;
 
@@ -56,7 +56,12 @@ public class Round {
 
     public void initializeWorld() {
         WorldCreator creator = new WorldCreator(worldName)
-            .type(WorldType.FLAT)
+            .generator(new ChunkGenerator() {
+                @Override
+                public ChunkData generateChunkData(World world, Random random, int x, int z, BiomeGrid biome) {
+                    return createChunkData(world);
+                }
+            })
             .generateStructures(false);
         world = Bukkit.createWorld(creator);
         if (world == null) {
