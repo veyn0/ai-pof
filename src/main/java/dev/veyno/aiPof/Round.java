@@ -39,6 +39,9 @@ public class Round {
     private final List<Material> itemPool;
     private World world;
     private Location waitingSpawn;
+    private Location waitingPlatformCenter;
+    private int waitingPlatformRadius;
+    private int waitingPlatformY;
     private BukkitTask itemTask;
     private BukkitTask countdownTask;
     private boolean started;
@@ -147,6 +150,7 @@ public class Round {
             }
         }
         teleportPlayersToPillars();
+        clearWaitingPlatform();
         scheduleItemDrops();
         broadcast("§6Pillars of Fortune gestartet! Viel Glück.");
     }
@@ -226,11 +230,27 @@ public class Round {
     }
 
     private void buildWaitingPlatform(int y) {
-        int radius = 3;
-        for (int x = -radius; x <= radius; x++) {
-            for (int z = -radius; z <= radius; z++) {
+        waitingPlatformRadius = 3;
+        waitingPlatformY = y;
+        waitingPlatformCenter = new Location(world, 0, y, 0);
+        for (int x = -waitingPlatformRadius; x <= waitingPlatformRadius; x++) {
+            for (int z = -waitingPlatformRadius; z <= waitingPlatformRadius; z++) {
                 Block block = world.getBlockAt(x, y, z);
                 block.setType(Material.SMOOTH_STONE);
+            }
+        }
+    }
+
+    private void clearWaitingPlatform() {
+        if (waitingPlatformCenter == null) {
+            return;
+        }
+        int centerX = waitingPlatformCenter.getBlockX();
+        int centerZ = waitingPlatformCenter.getBlockZ();
+        for (int x = -waitingPlatformRadius; x <= waitingPlatformRadius; x++) {
+            for (int z = -waitingPlatformRadius; z <= waitingPlatformRadius; z++) {
+                Block block = world.getBlockAt(centerX + x, waitingPlatformY, centerZ + z);
+                block.setType(Material.AIR);
             }
         }
     }
