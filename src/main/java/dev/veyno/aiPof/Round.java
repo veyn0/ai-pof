@@ -126,6 +126,7 @@ public class Round {
         plugin.sendMessage(player, "eliminated");
         player.getInventory().clear();
         player.setInvulnerable(true);
+        applySpectatorSettings(player);
         checkForWinner();
     }
 
@@ -178,8 +179,18 @@ public class Round {
     }
 
     public void endRound(Player winner) {
+        endRound(winner, false);
+    }
+
+    public void endRoundImmediate(Player winner) {
+        endRound(winner, true);
+    }
+
+    private void endRound(Player winner, boolean immediateCleanup) {
         if (ended) {
-            cleanupWorld();
+            if (immediateCleanup) {
+                cleanupWorld();
+            }
             return;
         }
         ended = true;
@@ -200,14 +211,28 @@ public class Round {
         } else {
             broadcast("round-ended");
         }
-        World mainWorld = Bukkit.getWorlds().getFirst();
-        for (UUID uuid : new HashSet<>(participants)) {
-            Player player = Bukkit.getPlayer(uuid);
-            if (player != null) {
-                player.getInventory().clear();
-                player.setInvulnerable(false);
-                player.setGameMode(GameMode.SURVIVAL);
-                player.teleport(mainWorld.getSpawnLocation());
+        if (immediateCleanup) {
+            World mainWorld = Bukkit.getWorlds().getFirst();
+            for (UUID uuid : new HashSet<>(participants)) {
+                Player player = Bukkit.getPlayer(uuid);
+                if (player != null) {
+                    player.getInventory().clear();
+                    player.setInvulnerable(false);
+                    player.setGameMode(GameMode.SURVIVAL);
+                    player.teleport(mainWorld.getSpawnLocation());
+                }
+            }
+        } else {
+            Location spectatorSpawn = getSpectatorSpawn();
+            for (UUID uuid : new HashSet<>(participants)) {
+                Player player = Bukkit.getPlayer(uuid);
+                if (player != null) {
+                    player.getInventory().clear();
+                    applySpectatorSettings(player);
+                    if (spectatorSpawn != null) {
+                        player.teleport(spectatorSpawn);
+                    }
+                }
             }
         }
         if (endListener != null) {
@@ -216,7 +241,9 @@ public class Round {
         participants.clear();
         alivePlayers.clear();
         pillarAssignments.clear();
-        cleanupWorld();
+        if (immediateCleanup) {
+            cleanupWorld();
+        }
     }
 
     void cleanupWorld() {

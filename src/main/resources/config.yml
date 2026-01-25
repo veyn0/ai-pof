@@ -1,7 +1,7 @@
 min-players: 2
 start-countdown-seconds: 3
 item-interval-seconds: 10
-round-restart-cooldown-seconds: 10
+round-restart-cooldown-seconds: 5
 pillar-height: 64
 pillar-spacing: 6
 waiting-box:

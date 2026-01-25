@@ -30,6 +30,9 @@ public class RoundManager implements Listener {
     private final Map<UUID, String> playerRounds = new HashMap<>();
     private final Map<String, Set<UUID>> pendingParticipants = new HashMap<>();
     private final Map<String, org.bukkit.scheduler.BukkitTask> restartTasks = new HashMap<>();
+    private final Map<String, Round> endedRounds = new HashMap<>();
+    private final Map<String, Integer> roundCounters = new HashMap<>();
+    private static final int RESTART_DELAY_SECONDS = 5;
 
     public RoundManager(AiPof plugin) {
         this.plugin = plugin;
@@ -56,18 +59,21 @@ public class RoundManager implements Listener {
         Round round = new Round(plugin, this::handleRoundEnded);
         round.initializeWorld();
         rounds.put(roundId, round);
+        registerRoundId(roundId);
         return round;
     }
 
     public void shutdown() {
         Bukkit.getScheduler().cancelTasks(plugin);
         for (Round round : List.copyOf(rounds.values())) {
-            round.endRound(null);
+            round.endRoundImmediate(null);
         }
         rounds.clear();
         playerRounds.clear();
         pendingParticipants.clear();
         restartTasks.clear();
+        endedRounds.clear();
+        roundCounters.clear();
     }
 
     public void forceStart(Player player, String id) {
@@ -254,35 +260,47 @@ public class RoundManager implements Listener {
             }
         }
         if (remaining.isEmpty()) {
+            round.cleanupWorld();
             return;
         }
-        pendingParticipants.put(roundId, remaining);
-        int cooldownSeconds = plugin.getConfig().getInt("round-restart-cooldown-seconds", 10);
+        String baseId = baseId(roundId);
+        pendingParticipants.put(baseId, remaining);
+        endedRounds.put(baseId, round);
         for (UUID uuid : remaining) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
-                plugin.sendMessage(player, "round-restart", Map.of("seconds", Integer.toString(cooldownSeconds)));
+                playerRounds.put(uuid, baseId);
+                plugin.sendMessage(player, "round-restart", Map.of("seconds", Integer.toString(RESTART_DELAY_SECONDS)));
             }
         }
-        org.bukkit.scheduler.BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> restartRound(roundId), cooldownSeconds * 20L);
-        restartTasks.put(roundId, task);
+        org.bukkit.scheduler.BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> restartRound(baseId), RESTART_DELAY_SECONDS * 20L);
+        restartTasks.put(baseId, task);
     }
 
-    private void restartRound(String roundId) {
-        Set<UUID> remaining = pendingParticipants.remove(roundId);
-        restartTasks.remove(roundId);
+    private void restartRound(String baseId) {
+        Set<UUID> remaining = pendingParticipants.remove(baseId);
+        restartTasks.remove(baseId);
+        Round endedRound = endedRounds.remove(baseId);
         if (remaining == null || remaining.isEmpty()) {
+            if (endedRound != null) {
+                endedRound.cleanupWorld();
+            }
             return;
         }
-        Round newRound = createRound(roundId);
+        String nextRoundId = nextRoundId(baseId);
+        Round newRound = createRound(nextRoundId);
         for (UUID uuid : remaining) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null && player.isOnline()) {
                 newRound.addPlayer(player);
-                playerRounds.put(uuid, roundId);
+                newRound.applySpectatorSettings(player);
+                playerRounds.put(uuid, nextRoundId);
             } else {
                 playerRounds.remove(uuid);
             }
+        }
+        if (endedRound != null) {
+            endedRound.cleanupWorld();
         }
     }
 
@@ -320,6 +338,10 @@ public class RoundManager implements Listener {
             if (task != null) {
                 task.cancel();
             }
+            Round endedRound = endedRounds.remove(id);
+            if (endedRound != null) {
+                endedRound.cleanupWorld();
+            }
         }
         if (notify) {
             plugin.sendMessage(player, "left");
@@ -337,6 +359,62 @@ public class RoundManager implements Listener {
 
     private String normalizeId(String id) {
         return id == null ? "" : id.trim().toLowerCase();
+    }
+
+    private String baseId(String id) {
+        String normalized = normalizeId(id);
+        int dashIndex = normalized.lastIndexOf('-');
+        if (dashIndex <= 0) {
+            return normalized;
+        }
+        String suffix = normalized.substring(dashIndex + 1);
+        for (int i = 0; i < suffix.length(); i++) {
+            if (!Character.isDigit(suffix.charAt(i))) {
+                return normalized;
+            }
+        }
+        return normalized.substring(0, dashIndex);
+    }
+
+    private void registerRoundId(String id) {
+        String normalized = normalizeId(id);
+        String baseId = baseId(normalized);
+        int counter = extractCounter(normalized, baseId);
+        int current = roundCounters.getOrDefault(baseId, 1);
+        if (counter > current) {
+            roundCounters.put(baseId, counter);
+        } else {
+            roundCounters.putIfAbsent(baseId, current);
+        }
+    }
+
+    private int extractCounter(String normalizedId, String baseId) {
+        if (!normalizedId.startsWith(baseId) || normalizedId.length() == baseId.length()) {
+            return 1;
+        }
+        if (normalizedId.charAt(baseId.length()) != '-') {
+            return 1;
+        }
+        String suffix = normalizedId.substring(baseId.length() + 1);
+        if (suffix.isEmpty()) {
+            return 1;
+        }
+        for (int i = 0; i < suffix.length(); i++) {
+            if (!Character.isDigit(suffix.charAt(i))) {
+                return 1;
+            }
+        }
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException ignored) {
+            return 1;
+        }
+    }
+
+    private String nextRoundId(String baseId) {
+        int next = roundCounters.getOrDefault(baseId, 1) + 1;
+        roundCounters.put(baseId, next);
+        return baseId + "-" + next;
     }
 
     private String findRoundId(Round round) {
