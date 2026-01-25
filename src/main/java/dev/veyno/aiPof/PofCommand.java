@@ -3,6 +3,7 @@ package dev.veyno.aiPof;
 import java.util.Arrays;
 import java.util.List;
 import java.util.ArrayList;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -28,37 +29,37 @@ public class PofCommand implements CommandExecutor, TabCompleter {
         switch (sub) {
             case "create" -> {
                 if (!sender.hasPermission("pof.admin")) {
-                    sender.sendMessage("§cKeine Berechtigung.");
+                    plugin.sendMessage(sender, "no-permission");
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage("§cBitte eine ID angeben: /pof create <id>");
+                    plugin.sendMessage(sender, "create-usage");
                     return true;
                 }
                 try {
                     String id = args[1];
                     roundManager.createRound(id);
-                    sender.sendMessage("§aNeue Runde erstellt: " + id + ". /pof join " + id + " zum Beitreten.");
+                    plugin.sendMessage(sender, "created", Placeholder.unparsed("id", id));
                 } catch (IllegalArgumentException ex) {
-                    sender.sendMessage("§c" + ex.getMessage());
+                    plugin.sendMessage(sender, "error", Placeholder.unparsed("message", ex.getMessage()));
                 } catch (IllegalStateException ex) {
-                    sender.sendMessage("§c" + ex.getMessage());
+                    plugin.sendMessage(sender, "error", Placeholder.unparsed("message", ex.getMessage()));
                 }
             }
             case "join" -> {
                 if (!(sender instanceof Player player)) {
-                    sender.sendMessage("§cNur Spieler können beitreten.");
+                    plugin.sendMessage(sender, "only-players-join");
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage("§cBitte eine ID angeben: /pof join <id>");
+                    plugin.sendMessage(sender, "join-usage");
                     return true;
                 }
                 roundManager.join(player, args[1]);
             }
             case "leave" -> {
                 if (!(sender instanceof Player player)) {
-                    sender.sendMessage("§cNur Spieler können die Runde verlassen.");
+                    plugin.sendMessage(sender, "only-players-leave");
                     return true;
                 }
                 if (args.length >= 2) {
@@ -69,46 +70,57 @@ public class PofCommand implements CommandExecutor, TabCompleter {
             }
             case "start" -> {
                 if (!(sender instanceof Player player)) {
-                    sender.sendMessage("§cNur Spieler können starten.");
+                    plugin.sendMessage(sender, "only-players-start");
                     return true;
                 }
                 if (!sender.hasPermission("pof.admin")) {
-                    sender.sendMessage("§cKeine Berechtigung.");
+                    plugin.sendMessage(sender, "start-no-permission");
                     return true;
                 }
                 if (args.length < 2) {
-                    sender.sendMessage("§cBitte eine ID angeben: /pof start <id>");
+                    plugin.sendMessage(sender, "start-usage");
                     return true;
                 }
                 roundManager.forceStart(player, args[1]);
             }
             case "status" -> {
                 if (args.length < 2) {
-                    sender.sendMessage("§cBitte eine ID angeben: /pof status <id>");
+                    plugin.sendMessage(sender, "status-usage");
                     return true;
                 }
                 String id = args[1];
                 var round = roundManager.getRound(id);
                 if (round.isEmpty() || round.get().isEnded()) {
-                    sender.sendMessage("§eKeine aktive Runde mit dieser ID.");
+                    plugin.sendMessage(sender, "status-no-active");
                     return true;
                 }
                 Round roundInstance = round.get();
-                sender.sendMessage("§eRunde: " + (roundInstance.isStarted() ? "läuft" : "wartet"));
+                String statusKey = roundInstance.isStarted() ? "status-running" : "status-waiting";
+                plugin.sendMessage(
+                    sender,
+                    "status-line",
+                    Placeholder.component("status", plugin.message(statusKey))
+                );
             }
             case "list" -> {
                 List<String> ids = roundManager.getRoundIds();
                 if (ids.isEmpty()) {
-                    sender.sendMessage("§eKeine aktiven Runden.");
+                    plugin.sendMessage(sender, "list-none");
                     return true;
                 }
-                sender.sendMessage("§6Aktive Runden:");
+                plugin.sendMessage(sender, "list-header");
                 for (String id : ids) {
                     var round = roundManager.getRound(id).orElse(null);
                     if (round == null) {
                         continue;
                     }
-                    sender.sendMessage("§e- " + id + " §7(" + (round.isStarted() ? "läuft" : "wartet") + ")");
+                    String statusKey = round.isStarted() ? "status-running" : "status-waiting";
+                    plugin.sendMessage(
+                        sender,
+                        "list-entry",
+                        Placeholder.unparsed("id", id),
+                        Placeholder.component("status", plugin.message(statusKey))
+                    );
                 }
             }
             default -> sendHelp(sender);
@@ -117,13 +129,13 @@ public class PofCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage("§6Pillars of Fortune Befehle:");
-        sender.sendMessage("§e/pof create <id> §7- Neue Runde erstellen");
-        sender.sendMessage("§e/pof join <id> §7- Wartebereich betreten");
-        sender.sendMessage("§e/pof leave [id] §7- Runde verlassen");
-        sender.sendMessage("§e/pof start <id> §7- Runde sofort starten");
-        sender.sendMessage("§e/pof status <id> §7- Rundenstatus anzeigen");
-        sender.sendMessage("§e/pof list §7- Aktive Runden anzeigen");
+        plugin.sendMessage(sender, "help-header");
+        plugin.sendMessage(sender, "help-create");
+        plugin.sendMessage(sender, "help-join");
+        plugin.sendMessage(sender, "help-leave");
+        plugin.sendMessage(sender, "help-start");
+        plugin.sendMessage(sender, "help-status");
+        plugin.sendMessage(sender, "help-list");
     }
 
     @Override
