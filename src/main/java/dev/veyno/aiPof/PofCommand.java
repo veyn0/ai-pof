@@ -1,9 +1,10 @@
 package dev.veyno.aiPof;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.ArrayList;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import java.util.Map;
+import java.util.Objects;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -39,11 +40,11 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                 try {
                     String id = args[1];
                     roundManager.createRound(id);
-                    plugin.sendMessage(sender, "created", Placeholder.unparsed("id", id));
+                    plugin.sendMessage(sender, "created", Map.of("id", id));
                 } catch (IllegalArgumentException ex) {
-                    plugin.sendMessage(sender, "error", Placeholder.unparsed("message", ex.getMessage()));
+                    plugin.sendMessage(sender, "error", Map.of("message", Objects.toString(ex.getMessage(), "")));
                 } catch (IllegalStateException ex) {
-                    plugin.sendMessage(sender, "error", Placeholder.unparsed("message", ex.getMessage()));
+                    plugin.sendMessage(sender, "error", Map.of("message", Objects.toString(ex.getMessage(), "")));
                 }
             }
             case "join" -> {
@@ -96,11 +97,8 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                 }
                 Round roundInstance = round.get();
                 String statusKey = roundInstance.isStarted() ? "status-running" : "status-waiting";
-                plugin.sendMessage(
-                    sender,
-                    "status-line",
-                    Placeholder.component("status", plugin.message(statusKey))
-                );
+                String statusTemplate = plugin.messageTemplate(statusKey);
+                plugin.sendMessage(sender, "status-line", Map.of("status", statusTemplate));
             }
             case "list" -> {
                 List<String> ids = roundManager.getRoundIds();
@@ -115,12 +113,8 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                         continue;
                     }
                     String statusKey = round.isStarted() ? "status-running" : "status-waiting";
-                    plugin.sendMessage(
-                        sender,
-                        "list-entry",
-                        Placeholder.unparsed("id", id),
-                        Placeholder.component("status", plugin.message(statusKey))
-                    );
+                    String statusTemplate = plugin.messageTemplate(statusKey);
+                    plugin.sendMessage(sender, "list-entry", Map.of("id", id, "status", statusTemplate));
                 }
             }
             default -> sendHelp(sender);
