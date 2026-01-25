@@ -138,6 +138,14 @@ public class Round {
             countdownTask = null;
         }
         buildPillars();
+        for (UUID uuid : participants) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                player.setHealth(player.getMaxHealth());
+                player.setFoodLevel(20);
+                player.setSaturation(20f);
+            }
+        }
         teleportPlayersToPillars();
         scheduleItemDrops();
         broadcast("§6Pillars of Fortune gestartet! Viel Glück.");
