@@ -14,6 +14,9 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
+import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
 import org.bukkit.GameMode;
@@ -80,7 +83,7 @@ public class Round {
 
     public void addPlayer(Player player) {
         if (participants.contains(player.getUniqueId())) {
-            player.sendMessage("§eDu bist bereits im Wartebereich.");
+            plugin.sendMessage(player, "already-waiting");
             return;
         }
         participants.add(player.getUniqueId());
@@ -95,7 +98,7 @@ public class Round {
         if (spawn != null) {
             player.teleport(spawn);
         }
-        player.sendMessage("§aDu bist dem Wartebereich beigetreten.");
+        plugin.sendMessage(player, "joined");
         maybeStartCountdown();
     }
 
@@ -110,7 +113,7 @@ public class Round {
         if (teleportOut) {
             World mainWorld = Bukkit.getWorlds().getFirst();
             player.teleport(mainWorld.getSpawnLocation());
-            player.sendMessage("§eDu hast die Runde verlassen.");
+            plugin.sendMessage(player, "left");
         }
         checkForWinner();
     }
@@ -120,18 +123,18 @@ public class Round {
             return;
         }
         alivePlayers.remove(player.getUniqueId());
-        player.sendMessage("§cDu bist ausgeschieden.");
+        plugin.sendMessage(player, "eliminated");
         player.getInventory().clear();
         checkForWinner();
     }
 
     public void forceStart(Player player) {
         if (started) {
-            player.sendMessage("§eDie Runde läuft bereits.");
+            plugin.sendMessage(player, "round-already-started");
             return;
         }
         if (participants.size() < 1) {
-            player.sendMessage("§cKeine Spieler im Wartebereich.");
+            plugin.sendMessage(player, "no-players-waiting");
             return;
         }
         startRound();
@@ -165,7 +168,7 @@ public class Round {
         }
         clearWaitingBoxes();
         scheduleItemDropsWithDelay();
-        broadcast("§6Pillars of Fortune gestartet! Viel Glück.");
+        broadcast("round-started");
     }
 
     public void endRound(Player winner) {
@@ -187,9 +190,9 @@ public class Round {
             countdownTask = null;
         }
         if (winner != null) {
-            broadcast("§a" + winner.getName() + " hat die Runde gewonnen!");
+            broadcast("winner", Placeholder.unparsed("player", winner.getName()));
         } else {
-            broadcast("§eRunde beendet.");
+            broadcast("round-ended");
         }
         World mainWorld = Bukkit.getWorlds().getFirst();
         for (UUID uuid : new HashSet<>(participants)) {
@@ -320,7 +323,7 @@ public class Round {
             return;
         }
         int countdownSeconds = plugin.getConfig().getInt("start-countdown-seconds", 10);
-        broadcast("§eGenügend Spieler erreicht. Start in " + countdownSeconds + " Sekunden.");
+        broadcast("countdown-start", Placeholder.unparsed("seconds", Integer.toString(countdownSeconds)));
         countdownTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
             int remaining = countdownSeconds;
 
@@ -333,7 +336,7 @@ public class Round {
                     return;
                 }
                 if (remaining <= 5 || remaining % 5 == 0) {
-                    broadcast("§eStart in " + remaining + " Sekunden.");
+                    broadcast("countdown-tick", Placeholder.unparsed("seconds", Integer.toString(remaining)));
                 }
                 remaining--;
             }
@@ -442,7 +445,8 @@ public class Round {
         return 1;
     }
 
-    private void broadcast(String message) {
+    private void broadcast(String key, TagResolver... resolvers) {
+        Component message = plugin.message(key, resolvers);
         for (UUID uuid : participants) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
