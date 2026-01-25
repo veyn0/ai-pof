@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.bukkit.Bukkit;
@@ -31,6 +32,7 @@ public class Round {
     private final AiPof plugin;
     private final String worldName;
     private final Random random = new Random();
+    private final Consumer<Round> endListener;
     private final Set<UUID> participants = new HashSet<>();
     private final Set<UUID> alivePlayers = new HashSet<>();
     private final Map<UUID, Integer> pillarAssignments = new HashMap<>();
@@ -42,8 +44,9 @@ public class Round {
     private boolean started;
     private boolean ended;
 
-    public Round(AiPof plugin) {
+    public Round(AiPof plugin, Consumer<Round> endListener) {
         this.plugin = plugin;
+        this.endListener = endListener;
         this.worldName = "pof_round_" + System.currentTimeMillis();
         this.itemPool = Arrays.stream(Material.values())
             .filter(Material::isItem)
@@ -156,6 +159,9 @@ public class Round {
                 player.getInventory().clear();
                 player.teleport(mainWorld.getSpawnLocation());
             }
+        }
+        if (endListener != null) {
+            endListener.accept(this);
         }
         participants.clear();
         alivePlayers.clear();
@@ -318,6 +324,10 @@ public class Round {
 
     public boolean isParticipant(UUID uuid) {
         return participants.contains(uuid);
+    }
+
+    public Set<UUID> getParticipants() {
+        return new HashSet<>(participants);
     }
 
     public boolean isStarted() {

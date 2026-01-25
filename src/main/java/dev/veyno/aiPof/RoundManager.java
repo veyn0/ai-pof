@@ -1,6 +1,11 @@
 package dev.veyno.aiPof;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -13,69 +18,105 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 
 public class RoundManager implements Listener {
     private final AiPof plugin;
-    private Round currentRound;
+    private final Map<String, Round> rounds = new HashMap<>();
+    private final Map<UUID, String> playerRounds = new HashMap<>();
 
     public RoundManager(AiPof plugin) {
         this.plugin = plugin;
     }
 
-    public Optional<Round> getCurrentRound() {
-        return Optional.ofNullable(currentRound);
+    public Optional<Round> getRound(String id) {
+        if (id == null) {
+            return Optional.empty();
+        }
+        return Optional.ofNullable(rounds.get(normalizeId(id)));
     }
 
-    public Round createRound() {
-        if (currentRound != null && !currentRound.isEnded()) {
-            throw new IllegalStateException("Eine Runde läuft bereits.");
+    public List<String> getRoundIds() {
+        return rounds.keySet().stream().sorted().toList();
+    }
+
+    public Round createRound(String id) {
+        String roundId = requireId(id);
+        Round existing = rounds.get(roundId);
+        if (existing != null && !existing.isEnded()) {
+            throw new IllegalStateException("Eine Runde mit dieser ID läuft bereits.");
         }
-        currentRound = new Round(plugin);
-        currentRound.initializeWorld();
-        return currentRound;
+        rounds.remove(roundId);
+        Round round = new Round(plugin, this::handleRoundEnded);
+        round.initializeWorld();
+        rounds.put(roundId, round);
+        return round;
     }
 
     public void shutdown() {
-        if (currentRound != null) {
-            currentRound.endRound(null);
+        for (Round round : rounds.values()) {
+            round.endRound(null);
         }
+        rounds.clear();
+        playerRounds.clear();
     }
 
-    public void forceStart(Player player) {
-        if (currentRound == null) {
-            player.sendMessage("§cKeine aktive Runde. Nutze /pof create.");
+    public void forceStart(Player player, String id) {
+        Round round = getActiveRound(id, player);
+        if (round == null) {
             return;
         }
-        currentRound.forceStart(player);
+        round.forceStart(player);
     }
 
-    public void join(Player player) {
-        if (currentRound == null) {
-            player.sendMessage("§cKeine aktive Runde. Nutze /pof create.");
+    public void join(Player player, String id) {
+        Round round = getActiveRound(id, player);
+        if (round == null) {
             return;
         }
-        currentRound.addPlayer(player);
+        String roundId = normalizeId(id);
+        String existingId = playerRounds.get(player.getUniqueId());
+        if (existingId != null && !existingId.equals(roundId)) {
+            player.sendMessage("§cDu bist bereits in Runde " + existingId + ".");
+            return;
+        }
+        round.addPlayer(player);
+        playerRounds.put(player.getUniqueId(), roundId);
     }
 
     public void leave(Player player) {
-        if (currentRound == null) {
+        String roundId = playerRounds.get(player.getUniqueId());
+        if (roundId == null) {
             player.sendMessage("§cDu bist in keiner Runde.");
             return;
         }
-        currentRound.removePlayer(player, true);
+        leave(player, roundId);
+    }
+
+    public void leave(Player player, String id) {
+        String roundId = normalizeId(id);
+        Round round = rounds.get(roundId);
+        if (round == null || round.isEnded()) {
+            playerRounds.remove(player.getUniqueId());
+            player.sendMessage("§cDiese Runde existiert nicht mehr.");
+            return;
+        }
+        round.removePlayer(player, true);
+        playerRounds.remove(player.getUniqueId());
     }
 
     @EventHandler
     public void onPlayerDeath(PlayerDeathEvent event) {
-        if (currentRound == null) {
+        Round round = getPlayerRound(event.getEntity());
+        if (round == null) {
             return;
         }
-        currentRound.handleDeath(event.getEntity());
+        round.handleDeath(event.getEntity());
     }
 
     @EventHandler
     public void onPlayerRespawn(PlayerRespawnEvent event) {
-        if (currentRound == null) {
+        Round round = getPlayerRound(event.getPlayer());
+        if (round == null) {
             return;
         }
-        if (currentRound.isParticipant(event.getPlayer().getUniqueId()) && currentRound.isStarted()) {
+        if (round.isParticipant(event.getPlayer().getUniqueId()) && round.isStarted()) {
             World mainWorld = Bukkit.getWorlds().getFirst();
             event.setRespawnLocation(mainWorld.getSpawnLocation());
         }
@@ -83,23 +124,77 @@ public class RoundManager implements Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        if (currentRound == null) {
+        Round round = getPlayerRound(event.getPlayer());
+        if (round == null) {
             return;
         }
-        currentRound.removePlayer(event.getPlayer(), false);
+        round.removePlayer(event.getPlayer(), false);
+        playerRounds.remove(event.getPlayer().getUniqueId());
     }
 
     @EventHandler
     public void onPlayerMove(PlayerMoveEvent event) {
-        if (currentRound == null || !currentRound.isStarted()) {
+        Round round = getPlayerRound(event.getPlayer());
+        if (round == null || !round.isStarted()) {
             return;
         }
         Player player = event.getPlayer();
-        if (!currentRound.isParticipant(player.getUniqueId())) {
+        if (!round.isParticipant(player.getUniqueId())) {
             return;
         }
-        if (player.getWorld().equals(currentRound.getWorld()) && player.getLocation().getY() < 0) {
+        if (player.getWorld().equals(round.getWorld()) && player.getLocation().getY() < 0) {
             player.setHealth(0.0);
         }
+    }
+
+    private void handleRoundEnded(Round round) {
+        String roundId = findRoundId(round);
+        if (roundId == null) {
+            return;
+        }
+        Set<UUID> participants = round.getParticipants();
+        for (UUID uuid : participants) {
+            playerRounds.remove(uuid);
+        }
+        rounds.remove(roundId);
+    }
+
+    private Round getPlayerRound(Player player) {
+        String roundId = playerRounds.get(player.getUniqueId());
+        if (roundId == null) {
+            return null;
+        }
+        return rounds.get(roundId);
+    }
+
+    private Round getActiveRound(String id, Player player) {
+        String roundId = normalizeId(id);
+        Round round = rounds.get(roundId);
+        if (round == null || round.isEnded()) {
+            player.sendMessage("§cKeine aktive Runde mit dieser ID. Nutze /pof create <id>.");
+            return null;
+        }
+        return round;
+    }
+
+    private String requireId(String id) {
+        String roundId = normalizeId(id);
+        if (roundId.isBlank()) {
+            throw new IllegalArgumentException("ID darf nicht leer sein.");
+        }
+        return roundId;
+    }
+
+    private String normalizeId(String id) {
+        return id == null ? "" : id.trim().toLowerCase();
+    }
+
+    private String findRoundId(Round round) {
+        for (Map.Entry<String, Round> entry : rounds.entrySet()) {
+            if (entry.getValue() == round) {
+                return entry.getKey();
+            }
+        }
+        return null;
     }
 }
