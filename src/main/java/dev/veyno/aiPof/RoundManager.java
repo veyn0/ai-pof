@@ -51,7 +51,8 @@ public class RoundManager implements Listener {
     }
 
     public void shutdown() {
-        for (Round round : rounds.values()) {
+        Bukkit.getScheduler().cancelTasks(plugin);
+        for (Round round : List.copyOf(rounds.values())) {
             round.endRound(null);
         }
         rounds.clear();
