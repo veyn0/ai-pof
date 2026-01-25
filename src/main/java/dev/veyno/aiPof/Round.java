@@ -15,8 +15,6 @@ import java.util.function.Consumer;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import org.bukkit.Bukkit;
 import org.bukkit.Difficulty;
 import org.bukkit.GameMode;
@@ -195,7 +193,7 @@ public class Round {
             countdownTask = null;
         }
         if (winner != null) {
-            broadcast("winner", Placeholder.unparsed("player", winner.getName()));
+            broadcast("winner", Map.of("player", winner.getName()));
         } else {
             broadcast("round-ended");
         }
@@ -366,7 +364,7 @@ public class Round {
             return;
         }
         int countdownSeconds = plugin.getConfig().getInt("start-countdown-seconds", 10);
-        broadcast("countdown-start", Placeholder.unparsed("seconds", Integer.toString(countdownSeconds)));
+        broadcast("countdown-start", Map.of("seconds", Integer.toString(countdownSeconds)));
         countdownTask = Bukkit.getScheduler().runTaskTimer(plugin, new Runnable() {
             int remaining = countdownSeconds;
 
@@ -379,7 +377,7 @@ public class Round {
                     return;
                 }
                 if (remaining <= 5 || remaining % 5 == 0) {
-                    broadcast("countdown-tick", Placeholder.unparsed("seconds", Integer.toString(remaining)));
+                    broadcast("countdown-tick", Map.of("seconds", Integer.toString(remaining)));
                 }
                 remaining--;
             }
@@ -488,8 +486,12 @@ public class Round {
         return 1;
     }
 
-    private void broadcast(String key, TagResolver... resolvers) {
-        Component message = plugin.message(key, resolvers);
+    private void broadcast(String key) {
+        broadcast(key, Map.of());
+    }
+
+    private void broadcast(String key, Map<String, String> placeholders) {
+        Component message = plugin.message(key, placeholders);
         for (UUID uuid : participants) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
