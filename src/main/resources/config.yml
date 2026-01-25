@@ -1,6 +1,7 @@
 min-players: 2
 start-countdown-seconds: 3
 item-interval-seconds: 10
+round-restart-cooldown-seconds: 10
 pillar-height: 64
 pillar-spacing: 6
 waiting-box:
@@ -54,5 +55,6 @@ messages:
   round-started: "<gold>Pillars of Fortune gestartet! Viel Glück.</gold>"
   winner: "<green>{player} hat die Runde gewonnen!</green>"
   round-ended: "<yellow>Runde beendet.</yellow>"
+  round-restart: "<yellow>Nächste Runde startet in {seconds} Sekunden. Nutze /pof leave zum Verlassen.</yellow>"
   countdown-start: "<yellow>Genügend Spieler erreicht. Start in {seconds} Sekunden.</yellow>"
   countdown-tick: "<yellow>Start in {seconds} Sekunden.</yellow>"

@@ -28,6 +28,8 @@ public class RoundManager implements Listener {
     private final AiPof plugin;
     private final Map<String, Round> rounds = new HashMap<>();
     private final Map<UUID, String> playerRounds = new HashMap<>();
+    private final Map<String, Set<UUID>> pendingParticipants = new HashMap<>();
+    private final Map<String, org.bukkit.scheduler.BukkitTask> restartTasks = new HashMap<>();
 
     public RoundManager(AiPof plugin) {
         this.plugin = plugin;
@@ -64,6 +66,8 @@ public class RoundManager implements Listener {
         }
         rounds.clear();
         playerRounds.clear();
+        pendingParticipants.clear();
+        restartTasks.clear();
     }
 
     public void forceStart(Player player, String id) {
@@ -131,6 +135,9 @@ public class RoundManager implements Listener {
         String roundId = normalizeId(id);
         Round round = rounds.get(roundId);
         if (round == null || round.isEnded()) {
+            if (removePendingParticipant(player, roundId, true)) {
+                return;
+            }
             playerRounds.remove(player.getUniqueId());
             player.sendMessage("§cDiese Runde existiert nicht mehr.");
             return;
@@ -173,19 +180,22 @@ public class RoundManager implements Listener {
             return;
         }
         if (round.isParticipant(event.getPlayer().getUniqueId()) && round.isStarted()) {
-            World mainWorld = Bukkit.getWorlds().getFirst();
-            event.setRespawnLocation(mainWorld.getSpawnLocation());
+            if (!round.isAlive(event.getPlayer().getUniqueId())) {
+                event.setRespawnLocation(round.getSpectatorSpawn());
+                Bukkit.getScheduler().runTask(plugin, () -> round.applySpectatorSettings(event.getPlayer()));
+            }
         }
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         Round round = getPlayerRound(event.getPlayer());
-        if (round == null) {
+        if (round != null) {
+            round.removePlayer(event.getPlayer(), false);
+            playerRounds.remove(event.getPlayer().getUniqueId());
             return;
         }
-        round.removePlayer(event.getPlayer(), false);
-        playerRounds.remove(event.getPlayer().getUniqueId());
+        removePendingParticipant(event.getPlayer(), null, false);
     }
 
     @EventHandler
@@ -230,11 +240,50 @@ public class RoundManager implements Listener {
         if (roundId == null) {
             return;
         }
-        Set<UUID> participants = round.getParticipants();
-        for (UUID uuid : participants) {
-            playerRounds.remove(uuid);
-        }
         rounds.remove(roundId);
+        Set<UUID> participants = round.getParticipants();
+        Set<UUID> remaining = participants.stream()
+            .filter(uuid -> {
+                Player player = Bukkit.getPlayer(uuid);
+                return player != null && player.isOnline();
+            })
+            .collect(Collectors.toSet());
+        for (UUID uuid : participants) {
+            if (!remaining.contains(uuid)) {
+                playerRounds.remove(uuid);
+            }
+        }
+        if (remaining.isEmpty()) {
+            return;
+        }
+        pendingParticipants.put(roundId, remaining);
+        int cooldownSeconds = plugin.getConfig().getInt("round-restart-cooldown-seconds", 10);
+        for (UUID uuid : remaining) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                plugin.sendMessage(player, "round-restart", Map.of("seconds", Integer.toString(cooldownSeconds)));
+            }
+        }
+        org.bukkit.scheduler.BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> restartRound(roundId), cooldownSeconds * 20L);
+        restartTasks.put(roundId, task);
+    }
+
+    private void restartRound(String roundId) {
+        Set<UUID> remaining = pendingParticipants.remove(roundId);
+        restartTasks.remove(roundId);
+        if (remaining == null || remaining.isEmpty()) {
+            return;
+        }
+        Round newRound = createRound(roundId);
+        for (UUID uuid : remaining) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null && player.isOnline()) {
+                newRound.addPlayer(player);
+                playerRounds.put(uuid, roundId);
+            } else {
+                playerRounds.remove(uuid);
+            }
+        }
     }
 
     private Round getPlayerRound(Player player) {
@@ -253,6 +302,29 @@ public class RoundManager implements Listener {
             return null;
         }
         return round;
+    }
+
+    private boolean removePendingParticipant(Player player, String roundId, boolean notify) {
+        String id = roundId != null ? roundId : playerRounds.get(player.getUniqueId());
+        if (id == null) {
+            return false;
+        }
+        Set<UUID> pending = pendingParticipants.get(id);
+        if (pending == null || !pending.remove(player.getUniqueId())) {
+            return false;
+        }
+        playerRounds.remove(player.getUniqueId());
+        if (pending.isEmpty()) {
+            pendingParticipants.remove(id);
+            org.bukkit.scheduler.BukkitTask task = restartTasks.remove(id);
+            if (task != null) {
+                task.cancel();
+            }
+        }
+        if (notify) {
+            plugin.sendMessage(player, "left");
+        }
+        return true;
     }
 
     private String requireId(String id) {

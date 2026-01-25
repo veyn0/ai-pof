@@ -106,6 +106,7 @@ public class Round {
         alivePlayers.remove(player.getUniqueId());
         pillarAssignments.remove(player.getUniqueId());
         player.setInvulnerable(false);
+        player.setGameMode(GameMode.SURVIVAL);
         if (!started) {
             buildWaitingBoxes();
         }
@@ -124,6 +125,7 @@ public class Round {
         alivePlayers.remove(player.getUniqueId());
         plugin.sendMessage(player, "eliminated");
         player.getInventory().clear();
+        player.setInvulnerable(true);
         checkForWinner();
     }
 
@@ -204,6 +206,7 @@ public class Round {
             if (player != null) {
                 player.getInventory().clear();
                 player.setInvulnerable(false);
+                player.setGameMode(GameMode.SURVIVAL);
                 player.teleport(mainWorld.getSpawnLocation());
             }
         }
@@ -503,6 +506,28 @@ public class Round {
 
     public boolean isParticipant(UUID uuid) {
         return participants.contains(uuid);
+    }
+
+    public boolean isAlive(UUID uuid) {
+        return alivePlayers.contains(uuid);
+    }
+
+    public Location getSpectatorSpawn() {
+        if (world == null) {
+            return Bukkit.getWorlds().getFirst().getSpawnLocation();
+        }
+        int pillarHeight = plugin.getConfig().getInt("pillar-height", 64);
+        int yOffset = plugin.getConfig().getInt("waiting-box.y-offset", 4);
+        int height = plugin.getConfig().getInt("waiting-box.height", 3);
+        int centerX = plugin.getConfig().getInt("waiting-box.center-x", 0);
+        int centerZ = plugin.getConfig().getInt("waiting-box.center-z", 0);
+        int y = pillarHeight + yOffset + height + 3;
+        return new Location(world, centerX + 0.5, y, centerZ + 0.5);
+    }
+
+    public void applySpectatorSettings(Player player) {
+        player.setGameMode(GameMode.SPECTATOR);
+        player.setInvulnerable(true);
     }
 
     public Set<UUID> getParticipants() {
