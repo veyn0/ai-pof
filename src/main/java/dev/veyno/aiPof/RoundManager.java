@@ -1,6 +1,7 @@
 package dev.veyno.aiPof;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -20,6 +21,7 @@ import org.bukkit.event.player.PlayerRespawnEvent;
 public class RoundManager implements Listener {
     private final AiPof plugin;
     private final Map<String, Round> rounds = new HashMap<>();
+    private final Set<String> creatingRounds = new HashSet<>();
     private final Map<UUID, String> playerRounds = new HashMap<>();
 
     public RoundManager(AiPof plugin) {
@@ -38,16 +40,27 @@ public class RoundManager implements Listener {
     }
 
     public Round createRound(String id) {
+        if (!Bukkit.isPrimaryThread()) {
+            throw new IllegalStateException("Runden dürfen nur im Hauptthread erstellt werden.");
+        }
         String roundId = requireId(id);
+        if (creatingRounds.contains(roundId)) {
+            throw new IllegalStateException("Diese Runde wird bereits erstellt.");
+        }
         Round existing = rounds.get(roundId);
         if (existing != null && !existing.isEnded()) {
             throw new IllegalStateException("Eine Runde mit dieser ID läuft bereits.");
         }
         rounds.remove(roundId);
-        Round round = new Round(plugin, this::handleRoundEnded);
-        round.initializeWorld();
-        rounds.put(roundId, round);
-        return round;
+        creatingRounds.add(roundId);
+        try {
+            Round round = new Round(plugin, this::handleRoundEnded);
+            round.initializeWorld();
+            rounds.put(roundId, round);
+            return round;
+        } finally {
+            creatingRounds.remove(roundId);
+        }
     }
 
     public void shutdown() {
@@ -177,6 +190,7 @@ public class RoundManager implements Listener {
             playerRounds.remove(uuid);
         }
         rounds.remove(roundId);
+        creatingRounds.remove(roundId);
     }
 
     private Round getPlayerRound(Player player) {

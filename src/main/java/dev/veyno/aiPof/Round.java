@@ -50,7 +50,7 @@ public class Round {
     public Round(AiPof plugin, Consumer<Round> endListener) {
         this.plugin = plugin;
         this.endListener = endListener;
-        this.worldName = "pof_round_" + System.currentTimeMillis();
+        this.worldName = "pof_round_" + UUID.randomUUID();
         this.itemPool = Arrays.stream(Material.values())
             .filter(Material::isItem)
             .filter(material -> material != Material.AIR)
