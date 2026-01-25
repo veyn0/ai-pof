@@ -11,6 +11,7 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -107,7 +108,25 @@ public class RoundManager implements Listener {
         if (round == null) {
             return;
         }
+        if (!round.isStarted() && round.isParticipant(event.getEntity().getUniqueId())) {
+            return;
+        }
         round.handleDeath(event.getEntity());
+    }
+
+    @EventHandler
+    public void onEntityDamage(EntityDamageEvent event) {
+        if (!(event.getEntity() instanceof Player player)) {
+            return;
+        }
+        Round round = getPlayerRound(player);
+        if (round == null) {
+            return;
+        }
+        if (!round.isStarted() && round.isParticipant(player.getUniqueId())) {
+            event.setCancelled(true);
+            player.setFireTicks(0);
+        }
     }
 
     @EventHandler
