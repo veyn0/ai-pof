@@ -1,10 +1,14 @@
 package dev.veyno.aiPof.config;
 
+import dev.veyno.aiPof.domain.BlockExclusions;
+
 public class ConfigService {
     private final GameConfig config;
+    private final BlockExclusions blockExclusions;
 
     public ConfigService(GameConfig config) {
         this.config = config;
+        this.blockExclusions = new BlockExclusions(config.getBlockExclusions());
     }
 
     public int getMinPlayers() {
@@ -73,5 +77,9 @@ public class ConfigService {
 
     public int getStartBoxYOffset() {
         return config.getStartBox().yOffset();
+    }
+
+    public BlockExclusions getBlockExclusions() {
+        return blockExclusions;
     }
 }
