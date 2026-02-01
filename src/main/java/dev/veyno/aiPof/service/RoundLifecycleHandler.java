@@ -142,6 +142,7 @@ public class RoundLifecycleHandler {
                 player.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, 20 * 10, 0, true, false, true));
             }
         }
+        round.markAllParticipantsActive();
         round.transitionTo(RoundState.RUNNING);
         scheduleItemDrops(round);
         broadcast(round, "round-started");

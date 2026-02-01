@@ -23,7 +23,7 @@ public class ItemService {
     public BukkitTask scheduleItemDrops(JavaPlugin plugin, Round round, Runnable afterTick) {
         int intervalSeconds = config.getItemIntervalSeconds();
         return Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            for (UUID uuid : new HashSet<>(round.getAlivePlayersMutable())) {
+            for (UUID uuid : new HashSet<>(round.getAlivePlayers())) {
                 Player player = Bukkit.getPlayer(uuid);
                 if (player == null || !player.isOnline()) {
                     round.removeAlive(uuid);
