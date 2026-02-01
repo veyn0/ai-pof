@@ -27,7 +27,13 @@ jobs:
       - name: Build with Maven
         run: mvn -B package
 
+      - name: Rename jar with version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          JAR_PATH=$(ls target/ai-pof-*.jar | grep -v 'original-' | head -n 1)
+          cp "${JAR_PATH}" "target/ai-pof-${VERSION}.jar"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/*.jar
+          files: target/ai-pof-*.jar
