@@ -6,6 +6,7 @@ import dev.veyno.aiPof.domain.Round;
 import dev.veyno.aiPof.domain.RoundId;
 import dev.veyno.aiPof.domain.RoundState;
 import dev.veyno.aiPof.infrastructure.WorldService;
+import dev.veyno.aiPof.repository.RoundRepository;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -30,9 +31,7 @@ public class RoundLifecycleHandler {
     private final WorldService worldService;
     private final SpawnService spawnService;
     private final ItemService itemService;
-    private final Map<String, Round> rounds;
-    private final Map<UUID, String> playerRounds;
-    private final Map<String, Set<UUID>> pendingParticipants;
+    private final RoundRepository roundRepository;
     private final Map<String, BukkitTask> restartTasks;
     private final Map<String, Round> endedRounds;
     private final Map<String, Integer> roundCounters;
@@ -44,9 +43,7 @@ public class RoundLifecycleHandler {
         WorldService worldService,
         SpawnService spawnService,
         ItemService itemService,
-        Map<String, Round> rounds,
-        Map<UUID, String> playerRounds,
-        Map<String, Set<UUID>> pendingParticipants,
+        RoundRepository roundRepository,
         Map<String, BukkitTask> restartTasks,
         Map<String, Round> endedRounds,
         Map<String, Integer> roundCounters
@@ -56,9 +53,7 @@ public class RoundLifecycleHandler {
         this.worldService = worldService;
         this.spawnService = spawnService;
         this.itemService = itemService;
-        this.rounds = rounds;
-        this.playerRounds = playerRounds;
-        this.pendingParticipants = pendingParticipants;
+        this.roundRepository = roundRepository;
         this.restartTasks = restartTasks;
         this.endedRounds = endedRounds;
         this.roundCounters = roundCounters;
@@ -220,7 +215,7 @@ public class RoundLifecycleHandler {
         if (roundId == null) {
             return;
         }
-        rounds.remove(roundId);
+        roundRepository.rounds().remove(roundId);
         Set<UUID> participants = round.getParticipants();
         Set<UUID> remaining = participants.stream()
             .filter(uuid -> {
@@ -230,7 +225,7 @@ public class RoundLifecycleHandler {
             .collect(Collectors.toSet());
         for (UUID uuid : participants) {
             if (!remaining.contains(uuid)) {
-                playerRounds.remove(uuid);
+                roundRepository.playerRounds().remove(uuid);
             }
         }
         if (remaining.isEmpty()) {
@@ -238,12 +233,12 @@ public class RoundLifecycleHandler {
             return;
         }
         String baseId = new RoundId(roundId).baseId();
-        pendingParticipants.put(baseId, remaining);
+        roundRepository.pendingParticipants().put(baseId, remaining);
         endedRounds.put(baseId, round);
         for (UUID uuid : remaining) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
-                playerRounds.put(uuid, baseId);
+                roundRepository.playerRounds().put(uuid, baseId);
                 int restartDelay = config.getRoundRestartCooldownSeconds();
                 plugin.sendMessage(player, "round-restart", Map.of("seconds", Integer.toString(restartDelay)));
             }
@@ -254,7 +249,7 @@ public class RoundLifecycleHandler {
     }
 
     public void restartRound(String baseId) {
-        Set<UUID> remaining = pendingParticipants.remove(baseId);
+        Set<UUID> remaining = roundRepository.pendingParticipants().remove(baseId);
         restartTasks.remove(baseId);
         Round endedRound = endedRounds.remove(baseId);
         if (remaining == null || remaining.isEmpty()) {
@@ -273,9 +268,9 @@ public class RoundLifecycleHandler {
                 resetPlayerState(player);
                 addedPlayers.add(player);
                 plugin.sendMessage(player, "joined");
-                playerRounds.put(uuid, nextRoundId);
+                roundRepository.playerRounds().put(uuid, nextRoundId);
             } else {
-                playerRounds.remove(uuid);
+                roundRepository.playerRounds().remove(uuid);
             }
         }
         if (!addedPlayers.isEmpty()) {
@@ -292,14 +287,14 @@ public class RoundLifecycleHandler {
 
     public Round createRound(String id) {
         RoundId roundId = RoundId.fromRaw(id);
-        Round existing = rounds.get(roundId.value());
+        Round existing = roundRepository.rounds().get(roundId.value());
         if (existing != null && !existing.isEnded()) {
             throw new IllegalStateException("Eine Runde mit dieser ID läuft bereits.");
         }
-        rounds.remove(roundId.value());
+        roundRepository.rounds().remove(roundId.value());
         Round round = new Round(Round.WORLD_PREFIX + System.currentTimeMillis());
         round.setWorld(worldService.createWorld(round.getWorldName()));
-        rounds.put(roundId.value(), round);
+        roundRepository.rounds().put(roundId.value(), round);
         registerRoundId(roundId);
         return round;
     }
@@ -377,11 +372,11 @@ public class RoundLifecycleHandler {
         if (immediateCleanup) {
             String roundId = findRoundId(round);
             if (roundId != null) {
-                rounds.remove(roundId);
+                roundRepository.rounds().remove(roundId);
                 roundTasks.remove(roundId);
             }
             for (UUID uuid : round.getParticipants()) {
-                playerRounds.remove(uuid);
+                roundRepository.playerRounds().remove(uuid);
             }
             round.clearParticipants();
             worldService.cleanupWorld(round.getWorld());
@@ -396,7 +391,7 @@ public class RoundLifecycleHandler {
     }
 
     private String findRoundId(Round round) {
-        for (Map.Entry<String, Round> entry : rounds.entrySet()) {
+        for (Map.Entry<String, Round> entry : roundRepository.rounds().entrySet()) {
             if (entry.getValue() == round) {
                 return entry.getKey();
             }

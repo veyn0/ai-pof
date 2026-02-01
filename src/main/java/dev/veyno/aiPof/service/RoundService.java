@@ -6,6 +6,8 @@ import dev.veyno.aiPof.domain.BlockExclusions;
 import dev.veyno.aiPof.domain.Round;
 import dev.veyno.aiPof.domain.RoundId;
 import dev.veyno.aiPof.infrastructure.WorldService;
+import dev.veyno.aiPof.repository.InMemoryRoundRepository;
+import dev.veyno.aiPof.repository.RoundRepository;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,9 +38,7 @@ public class RoundService implements Listener {
     private final SpawnService spawnService;
     private final RoundLifecycleHandler lifecycleHandler;
     private final BlockExclusions blockExclusions;
-    private final Map<String, Round> rounds = new HashMap<>();
-    private final Map<UUID, String> playerRounds = new HashMap<>();
-    private final Map<String, Set<UUID>> pendingParticipants = new HashMap<>();
+    private final RoundRepository roundRepository;
     private final Map<String, BukkitTask> restartTasks = new HashMap<>();
     private final Map<String, Round> endedRounds = new HashMap<>();
     private final Map<String, Integer> roundCounters = new HashMap<>();
@@ -48,15 +48,14 @@ public class RoundService implements Listener {
         this.worldService = worldService;
         this.spawnService = spawnService;
         this.blockExclusions = config.getBlockExclusions();
+        this.roundRepository = new InMemoryRoundRepository();
         this.lifecycleHandler = new RoundLifecycleHandler(
             plugin,
             config,
             worldService,
             spawnService,
             itemService,
-            rounds,
-            playerRounds,
-            pendingParticipants,
+            roundRepository,
             restartTasks,
             endedRounds,
             roundCounters
@@ -67,11 +66,11 @@ public class RoundService implements Listener {
         if (id == null) {
             return Optional.empty();
         }
-        return Optional.ofNullable(rounds.get(RoundId.normalize(id)));
+        return Optional.ofNullable(roundRepository.rounds().get(RoundId.normalize(id)));
     }
 
     public List<String> getRoundIds() {
-        return rounds.keySet().stream().sorted().toList();
+        return roundRepository.rounds().keySet().stream().sorted().toList();
     }
 
     public Round createRound(String id) {
@@ -80,12 +79,12 @@ public class RoundService implements Listener {
 
     public void shutdown() {
         Bukkit.getScheduler().cancelTasks(plugin);
-        for (Round round : List.copyOf(rounds.values())) {
+        for (Round round : List.copyOf(roundRepository.rounds().values())) {
             lifecycleHandler.endRoundImmediate(round, null);
         }
-        rounds.clear();
-        playerRounds.clear();
-        pendingParticipants.clear();
+        roundRepository.rounds().clear();
+        roundRepository.playerRounds().clear();
+        roundRepository.pendingParticipants().clear();
         restartTasks.clear();
         endedRounds.clear();
         roundCounters.clear();
@@ -113,17 +112,17 @@ public class RoundService implements Listener {
             return;
         }
         String roundId = RoundId.normalize(id);
-        String existingId = playerRounds.get(player.getUniqueId());
+        String existingId = roundRepository.playerRounds().get(player.getUniqueId());
         if (existingId != null && !existingId.equals(roundId)) {
             player.sendMessage("§cDu bist bereits in Runde " + existingId + ".");
             return;
         }
         addPlayer(round, player);
-        playerRounds.put(player.getUniqueId(), roundId);
+        roundRepository.playerRounds().put(player.getUniqueId(), roundId);
     }
 
     public int cleanupUnusedWorldFolders() {
-        Set<World> activeWorlds = rounds.values().stream()
+        Set<World> activeWorlds = roundRepository.rounds().values().stream()
             .map(Round::getWorld)
             .filter(Objects::nonNull)
             .collect(Collectors.toSet());
@@ -131,7 +130,7 @@ public class RoundService implements Listener {
     }
 
     public void leave(Player player) {
-        String roundId = playerRounds.get(player.getUniqueId());
+        String roundId = roundRepository.playerRounds().get(player.getUniqueId());
         if (roundId == null) {
             player.sendMessage("§cDu bist in keiner Runde.");
             return;
@@ -141,17 +140,17 @@ public class RoundService implements Listener {
 
     public void leave(Player player, String id) {
         String roundId = RoundId.normalize(id);
-        Round round = rounds.get(roundId);
+        Round round = roundRepository.rounds().get(roundId);
         if (round == null || round.isEnded()) {
             if (removePendingParticipant(player, roundId, true)) {
                 return;
             }
-            playerRounds.remove(player.getUniqueId());
+            roundRepository.playerRounds().remove(player.getUniqueId());
             player.sendMessage("§cDiese Runde existiert nicht mehr.");
             return;
         }
         removePlayer(round, player, true);
-        playerRounds.remove(player.getUniqueId());
+        roundRepository.playerRounds().remove(player.getUniqueId());
     }
 
     @EventHandler
@@ -203,7 +202,7 @@ public class RoundService implements Listener {
         Round round = getPlayerRound(event.getPlayer());
         if (round != null) {
             removePlayer(round, event.getPlayer(), false);
-            playerRounds.remove(event.getPlayer().getUniqueId());
+            roundRepository.playerRounds().remove(event.getPlayer().getUniqueId());
             return;
         }
         removePendingParticipant(event.getPlayer(), null, false);
@@ -291,16 +290,16 @@ public class RoundService implements Listener {
 
 
     private Round getPlayerRound(Player player) {
-        String roundId = playerRounds.get(player.getUniqueId());
+        String roundId = roundRepository.playerRounds().get(player.getUniqueId());
         if (roundId == null) {
             return null;
         }
-        return rounds.get(roundId);
+        return roundRepository.rounds().get(roundId);
     }
 
     private Round getActiveRound(String id, Player player) {
         String roundId = RoundId.normalize(id);
-        Round round = rounds.get(roundId);
+        Round round = roundRepository.rounds().get(roundId);
         if (round == null || round.isEnded()) {
             player.sendMessage("§cKeine aktive Runde mit dieser ID. Nutze /pof create <id>.");
             return null;
@@ -309,17 +308,17 @@ public class RoundService implements Listener {
     }
 
     private boolean removePendingParticipant(Player player, String roundId, boolean notify) {
-        String id = roundId != null ? roundId : playerRounds.get(player.getUniqueId());
+        String id = roundId != null ? roundId : roundRepository.playerRounds().get(player.getUniqueId());
         if (id == null) {
             return false;
         }
-        Set<UUID> pending = pendingParticipants.get(id);
+        Set<UUID> pending = roundRepository.pendingParticipants().get(id);
         if (pending == null || !pending.remove(player.getUniqueId())) {
             return false;
         }
-        playerRounds.remove(player.getUniqueId());
+        roundRepository.playerRounds().remove(player.getUniqueId());
         if (pending.isEmpty()) {
-            pendingParticipants.remove(id);
+            roundRepository.pendingParticipants().remove(id);
             BukkitTask task = restartTasks.remove(id);
             if (task != null) {
                 task.cancel();
@@ -339,7 +338,7 @@ public class RoundService implements Listener {
         if (world == null) {
             return null;
         }
-        for (Round round : rounds.values()) {
+        for (Round round : roundRepository.rounds().values()) {
             if (world.equals(round.getWorld())) {
                 return round;
             }
