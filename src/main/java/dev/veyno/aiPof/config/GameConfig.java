@@ -21,6 +21,7 @@ public final class GameConfig {
     private static final int DEFAULT_START_BOX_RADIUS = 1;
     private static final int DEFAULT_START_BOX_HEIGHT = 2;
     private static final int DEFAULT_START_BOX_Y_OFFSET = 2;
+    private static final int DEFAULT_START_TELEPORT_DELAY_TICKS = 10;
     private static final boolean DEFAULT_ITEM_COUNT_ENABLED = true;
     private static final int DEFAULT_ITEM_COUNT_MAX = 3;
     private static final double DEFAULT_ITEM_COUNT_BASE_WEIGHT = 1.0;
@@ -36,6 +37,7 @@ public final class GameConfig {
     private final WaitingBox waitingBox;
     private final StartBox startBox;
     private final ItemCount itemCount;
+    private final int startTeleportDelayTicks;
     private final double projectileKnockbackStrength;
     private final List<String> blockExclusions;
 
@@ -49,6 +51,7 @@ public final class GameConfig {
         WaitingBox waitingBox,
         StartBox startBox,
         ItemCount itemCount,
+        int startTeleportDelayTicks,
         double projectileKnockbackStrength,
         List<String> blockExclusions
     ) {
@@ -61,6 +64,7 @@ public final class GameConfig {
         this.waitingBox = waitingBox;
         this.startBox = startBox;
         this.itemCount = itemCount;
+        this.startTeleportDelayTicks = startTeleportDelayTicks;
         this.projectileKnockbackStrength = projectileKnockbackStrength;
         this.blockExclusions = List.copyOf(blockExclusions);
     }
@@ -97,6 +101,12 @@ public final class GameConfig {
         WaitingBox waitingBox = loadWaitingBox(config, logger);
         StartBox startBox = loadStartBox(config, logger);
         ItemCount itemCount = loadItemCount(config, logger);
+        int startTeleportDelayTicks = readNonNegativeInt(
+            config,
+            logger,
+            "start-teleport-delay-ticks",
+            DEFAULT_START_TELEPORT_DELAY_TICKS
+        );
         double projectileKnockbackStrength = readPositiveDouble(
             config,
             logger,
@@ -116,6 +126,7 @@ public final class GameConfig {
             waitingBox,
             startBox,
             itemCount,
+            startTeleportDelayTicks,
             projectileKnockbackStrength,
             blockExclusions
         );
@@ -155,6 +166,10 @@ public final class GameConfig {
 
     public ItemCount getItemCount() {
         return itemCount;
+    }
+
+    public int getStartTeleportDelayTicks() {
+        return startTeleportDelayTicks;
     }
 
     public double getProjectileKnockbackStrength() {
@@ -255,6 +270,19 @@ public final class GameConfig {
             return defaultValue;
         }
         return section.getInt(key, defaultValue);
+    }
+
+    private static int readNonNegativeInt(FileConfiguration config, Logger logger, String path, int defaultValue) {
+        if (!config.contains(path)) {
+            warnMissing(logger, path, defaultValue);
+            return defaultValue;
+        }
+        int value = config.getInt(path, defaultValue);
+        if (value < 0) {
+            warnInvalid(logger, path, value, defaultValue);
+            return defaultValue;
+        }
+        return value;
     }
 
     private static double readPositiveDouble(

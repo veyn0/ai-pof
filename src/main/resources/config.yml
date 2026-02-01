@@ -2,6 +2,7 @@ min-players: 2
 start-countdown-seconds: 3
 item-interval-seconds: 10
 round-restart-cooldown-seconds: 5
+start-teleport-delay-ticks: 10
 pillar-height: 64
 pillar-spacing: 6
 projectile-knockback-strength: 0.8

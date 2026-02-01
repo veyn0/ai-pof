@@ -1,7 +1,18 @@
 package dev.veyno.aiPof;
 
 import java.util.Map;
+import dev.veyno.aiPof.command.CleanupCommand;
+import dev.veyno.aiPof.command.CommandService;
+import dev.veyno.aiPof.command.CommandTabHelper;
+import dev.veyno.aiPof.command.CreateRoundCommand;
+import dev.veyno.aiPof.command.HelpCommand;
+import dev.veyno.aiPof.command.JoinRoundCommand;
+import dev.veyno.aiPof.command.LeaveRoundCommand;
+import dev.veyno.aiPof.command.ListRoundsCommand;
 import dev.veyno.aiPof.command.PofCommand;
+import dev.veyno.aiPof.command.StartRoundCommand;
+import dev.veyno.aiPof.command.StatusCommand;
+import dev.veyno.aiPof.command.TabCompleteRoundCommand;
 import dev.veyno.aiPof.config.ConfigService;
 import dev.veyno.aiPof.config.GameConfig;
 import dev.veyno.aiPof.infrastructure.WorldService;
@@ -9,6 +20,7 @@ import dev.veyno.aiPof.service.ItemService;
 import dev.veyno.aiPof.service.ProjectileService;
 import dev.veyno.aiPof.service.RoundService;
 import dev.veyno.aiPof.service.SpawnService;
+import java.util.List;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
@@ -31,7 +43,26 @@ public final class AiPof extends JavaPlugin {
         ItemService itemService = new ItemService(configService);
         roundService = new RoundService(this, configService, worldService, spawnService, itemService);
         ProjectileService projectileService = new ProjectileService(configService);
-        PofCommand command = new PofCommand(this, roundService);
+        CommandService commandService = new CommandService(this);
+        CommandTabHelper tabHelper = new CommandTabHelper(roundService);
+        PofCommand command = new PofCommand(List.of(
+                new HelpCommand(this),
+                new CreateRoundCommand(this, roundService, commandService),
+                new TabCompleteRoundCommand("join",
+                        new JoinRoundCommand(this, roundService, commandService),
+                        tabHelper),
+                new TabCompleteRoundCommand("leave",
+                        new LeaveRoundCommand(roundService, commandService),
+                        tabHelper),
+                new TabCompleteRoundCommand("start",
+                        new StartRoundCommand(this, roundService, commandService),
+                        tabHelper),
+                new TabCompleteRoundCommand("status",
+                        new StatusCommand(this, roundService),
+                        tabHelper),
+                new ListRoundsCommand(this, roundService),
+                new CleanupCommand(this, roundService, commandService)
+        ));
         getCommand("pof").setExecutor(command);
         getCommand("pof").setTabCompleter(command);
         Bukkit.getPluginManager().registerEvents(roundService, this);

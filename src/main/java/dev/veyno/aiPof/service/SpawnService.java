@@ -3,6 +3,8 @@ package dev.veyno.aiPof.service;
 import dev.veyno.aiPof.config.ConfigService;
 import dev.veyno.aiPof.domain.Round;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.bukkit.Bukkit;
@@ -10,12 +12,35 @@ import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
+import org.bukkit.entity.Player;
 
 public class SpawnService {
+    private static final double START_TELEPORT_Y_TOLERANCE = 0.1;
     private final ConfigService config;
 
     public SpawnService(ConfigService config) {
         this.config = config;
+    }
+
+    public Map<UUID, Location> teleportParticipantsToStart(Round round, Set<UUID> participants) {
+        Map<UUID, Location> spawns = snapshotStartSpawns(round, participants);
+        teleportToSpawns(participants, spawns);
+        return spawns;
+    }
+
+    public void teleportParticipantsToStartDelayed(Set<UUID> participants, Map<UUID, Location> spawns) {
+        teleportToSpawns(participants, spawns);
+        for (UUID uuid : participants) {
+            Player player = Bukkit.getPlayer(uuid);
+            Location spawn = spawns.get(uuid);
+            if (player == null || spawn == null) {
+                continue;
+            }
+            double expectedY = spawn.getY();
+            if (player.getLocation().getY() + START_TELEPORT_Y_TOLERANCE < expectedY) {
+                player.teleport(spawn);
+            }
+        }
     }
 
     public void buildWaitingBoxes(Round round, Set<UUID> participants) {
@@ -113,7 +138,7 @@ public class SpawnService {
             for (int y = 0; y <= height; y++) {
                 world.getBlockAt(x, y, z).setType(Material.BEDROCK);
             }
-            round.getPillarAssignments().put(uuid, index);
+            round.assignPillar(uuid, index);
         }
     }
 
@@ -153,5 +178,26 @@ public class SpawnService {
         int x = (int) Math.round(Math.cos(angle) * radius);
         int z = (int) Math.round(Math.sin(angle) * radius);
         return new Location(world, x, 0, z);
+    }
+
+    private Map<UUID, Location> snapshotStartSpawns(Round round, Set<UUID> participants) {
+        Map<UUID, Location> spawns = new HashMap<>();
+        for (UUID uuid : participants) {
+            Location spawn = round.getWaitingBoxSpawns().get(uuid);
+            if (spawn != null) {
+                spawns.put(uuid, spawn.clone());
+            }
+        }
+        return spawns;
+    }
+
+    private void teleportToSpawns(Set<UUID> participants, Map<UUID, Location> spawns) {
+        for (UUID uuid : participants) {
+            Player player = Bukkit.getPlayer(uuid);
+            Location spawn = spawns.get(uuid);
+            if (player != null && spawn != null) {
+                player.teleport(spawn);
+            }
+        }
     }
 }
