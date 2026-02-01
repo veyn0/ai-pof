@@ -1,10 +1,10 @@
-min-players: 2
+min-players: 6
 start-countdown-seconds: 3
-item-interval-seconds: 10
+item-interval-seconds: 3
 round-restart-cooldown-seconds: 5
 start-teleport-delay-ticks: 10
 pillar-height: 64
-pillar-spacing: 6
+pillar-spacing: 12
 projectile-knockback-strength: 0.8
 block-exclusions:
   - "*ARMOR_TRIM*"
@@ -27,8 +27,8 @@ block-exclusions:
   # Eintrag ohne * => exakte Übereinstimmung (case-insensitive), z. B. "GLASS".
   # Eintrag mit * => contains-Match (case-insensitive), z. B. "*GLASS*".
 waiting-box:
-  radius: 6
-  height: 3
+  radius: 3
+  height: 4
   y-offset: 4
   center-x: 0
   center-z: 0
@@ -39,7 +39,7 @@ start-box:
 item-count:
   enabled: true
   max: 3
-  base-weight: 1.0
+  base-weight: 1
 messages:
   no-permission: "<red>Keine Berechtigung.</red>"
   create-usage: "<red>Bitte eine ID angeben:</red> <gray>/pof create <id></gray>"
