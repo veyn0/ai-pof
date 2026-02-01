@@ -6,6 +6,7 @@ import dev.veyno.aiPof.config.ConfigService;
 import dev.veyno.aiPof.config.GameConfig;
 import dev.veyno.aiPof.infrastructure.WorldService;
 import dev.veyno.aiPof.service.ItemService;
+import dev.veyno.aiPof.service.ProjectileService;
 import dev.veyno.aiPof.service.RoundService;
 import dev.veyno.aiPof.service.SpawnService;
 import net.kyori.adventure.text.Component;
@@ -29,10 +30,12 @@ public final class AiPof extends JavaPlugin {
         SpawnService spawnService = new SpawnService(configService);
         ItemService itemService = new ItemService(configService);
         roundService = new RoundService(this, configService, worldService, spawnService, itemService);
+        ProjectileService projectileService = new ProjectileService(configService);
         PofCommand command = new PofCommand(this, roundService);
         getCommand("pof").setExecutor(command);
         getCommand("pof").setTabCompleter(command);
         Bukkit.getPluginManager().registerEvents(roundService, this);
+        Bukkit.getPluginManager().registerEvents(projectileService, this);
     }
 
     @Override
