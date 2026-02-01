@@ -2,6 +2,7 @@ package dev.veyno.aiPof.service;
 
 import dev.veyno.aiPof.AiPof;
 import dev.veyno.aiPof.config.ConfigService;
+import dev.veyno.aiPof.domain.BlockExclusions;
 import dev.veyno.aiPof.domain.Round;
 import dev.veyno.aiPof.domain.RoundId;
 import dev.veyno.aiPof.infrastructure.WorldService;
@@ -34,6 +35,7 @@ public class RoundService implements Listener {
     private final WorldService worldService;
     private final SpawnService spawnService;
     private final RoundLifecycleHandler lifecycleHandler;
+    private final BlockExclusions blockExclusions;
     private final Map<String, Round> rounds = new HashMap<>();
     private final Map<UUID, String> playerRounds = new HashMap<>();
     private final Map<String, Set<UUID>> pendingParticipants = new HashMap<>();
@@ -45,6 +47,7 @@ public class RoundService implements Listener {
         this.plugin = plugin;
         this.worldService = worldService;
         this.spawnService = spawnService;
+        this.blockExclusions = config.getBlockExclusions();
         this.lifecycleHandler = new RoundLifecycleHandler(
             plugin,
             config,
@@ -227,7 +230,7 @@ public class RoundService implements Listener {
         if (round == null) {
             return;
         }
-        if (round.isWaitingBoxBlock(event.getBlock())) {
+        if (round.isWaitingBoxBlock(event.getBlock(), blockExclusions)) {
             event.setCancelled(true);
         }
     }
@@ -238,7 +241,7 @@ public class RoundService implements Listener {
         if (round == null) {
             return;
         }
-        if (round.isWaitingBoxBlock(event.getBlock())) {
+        if (round.isWaitingBoxBlock(event.getBlock(), blockExclusions)) {
             event.setCancelled(true);
         }
     }
