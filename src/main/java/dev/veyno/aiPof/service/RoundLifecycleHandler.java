@@ -131,13 +131,11 @@ public class RoundLifecycleHandler {
             if (player != null) {
                 resetPlayerState(player);
                 player.setInvulnerable(false);
-                Location spawn = round.getWaitingBoxSpawns().get(uuid);
-                if (spawn != null) {
-                    player.teleport(spawn);
-                }
             }
         }
+        Map<UUID, Location> startSpawns = spawnService.teleportParticipantsToStart(round, round.getParticipants());
         spawnService.clearWaitingBoxes(round);
+        scheduleStartTeleportCheck(round, startSpawns);
         for (UUID uuid : round.getParticipants()) {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
@@ -317,6 +315,22 @@ public class RoundLifecycleHandler {
         tasks.itemDelayTask = Bukkit.getScheduler().runTaskLater(plugin, () -> {
             tasks.itemTask = itemService.scheduleItemDrops(plugin, round, () -> checkForWinner(round));
         }, 20L * 5);
+    }
+
+    private void scheduleStartTeleportCheck(Round round, Map<UUID, Location> startSpawns) {
+        if (startSpawns.isEmpty()) {
+            return;
+        }
+        int delayTicks = config.getStartTeleportDelayTicks();
+        if (delayTicks <= 0) {
+            return;
+        }
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            if (!round.isRunning() && !round.isWaitingForStart()) {
+                return;
+            }
+            spawnService.teleportParticipantsToStartDelayed(round.getParticipants(), startSpawns);
+        }, delayTicks);
     }
 
     private void endRound(Round round, Player winner, boolean immediateCleanup) {

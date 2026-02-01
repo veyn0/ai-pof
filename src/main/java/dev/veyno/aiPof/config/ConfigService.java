@@ -31,6 +31,10 @@ public class ConfigService {
         return config.getItemIntervalSeconds();
     }
 
+    public int getStartTeleportDelayTicks() {
+        return config.getStartTeleportDelayTicks();
+    }
+
     public int getRoundRestartCooldownSeconds() {
         return config.getRoundRestartCooldownSeconds();
     }
