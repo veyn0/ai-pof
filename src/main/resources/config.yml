@@ -24,8 +24,6 @@ block-exclusions:
   - "*BOOK*"
   - "*TEST_INSTANCE*"
   - "*STRUCTURE_BLOCK*"
-  # Eintrag ohne * => exakte Übereinstimmung (case-insensitive), z. B. "GLASS".
-  # Eintrag mit * => contains-Match (case-insensitive), z. B. "*GLASS*".
 waiting-box:
   radius: 3
   height: 4
