@@ -16,6 +16,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.logging.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -42,9 +43,11 @@ public class RoundService implements Listener {
     private final Map<String, BukkitTask> restartTasks = new HashMap<>();
     private final Map<String, Round> endedRounds = new HashMap<>();
     private final Map<String, Integer> roundCounters = new HashMap<>();
+    private final Logger logger;
 
     public RoundService(AiPof plugin, ConfigService config, WorldService worldService, SpawnService spawnService, ItemService itemService) {
         this.plugin = plugin;
+        this.logger = plugin.getLogger();
         this.worldService = worldService;
         this.spawnService = spawnService;
         this.blockExclusions = config.getBlockExclusions();
@@ -216,9 +219,11 @@ public class RoundService implements Listener {
         }
         Player player = event.getPlayer();
         if (!round.isParticipant(player.getUniqueId())) {
+            logger.fine(() -> "player-move ignored reason=not-participant player=" + player.getName());
             return;
         }
         if (player.getWorld().equals(round.getWorld()) && player.getLocation().getY() < 0) {
+            logger.info(() -> "player-move void-fall player=" + player.getName() + " roundWorld=" + round.getWorldName());
             player.setHealth(0.0);
         }
     }
@@ -255,7 +260,15 @@ public class RoundService implements Listener {
         lifecycleHandler.buildWaitingBoxes(round);
         Location spawn = round.getWaitingBoxSpawns().get(player.getUniqueId());
         if (spawn != null) {
-            player.teleport(spawn);
+            boolean success = player.teleport(spawn);
+            logger.info(() -> "teleport result=" + success
+                + " reason=join-waiting-box player=" + player.getName()
+                + " world=" + spawn.getWorld().getName()
+                + " x=" + spawn.getBlockX()
+                + " y=" + spawn.getBlockY()
+                + " z=" + spawn.getBlockZ());
+        } else {
+            logger.warning(() -> "teleport skipped reason=missing-waiting-box player=" + player.getName());
         }
         plugin.sendMessage(player, "joined");
         lifecycleHandler.maybeStartCountdown(round);
@@ -270,7 +283,14 @@ public class RoundService implements Listener {
         }
         if (teleportOut) {
             World mainWorld = Bukkit.getWorlds().getFirst();
-            player.teleport(mainWorld.getSpawnLocation());
+            Location spawn = mainWorld.getSpawnLocation();
+            boolean success = player.teleport(spawn);
+            logger.info(() -> "teleport result=" + success
+                + " reason=leave-world player=" + player.getName()
+                + " world=" + spawn.getWorld().getName()
+                + " x=" + spawn.getBlockX()
+                + " y=" + spawn.getBlockY()
+                + " z=" + spawn.getBlockZ());
             plugin.sendMessage(player, "left");
         }
         lifecycleHandler.checkForWinner(round);
