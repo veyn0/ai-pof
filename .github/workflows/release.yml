@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.21.8-3)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -27,9 +32,24 @@ jobs:
       - name: Build with Maven
         run: mvn -B package
 
+      - name: Resolve release tag
+        id: release_tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "${TAG}" =~ ^v ]]; then
+            echo "Release tag must start with 'v'." >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
       - name: Rename jar with version
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
+          TAG="${{ steps.release_tag.outputs.tag }}"
+          VERSION="${TAG#v}"
           JAR_PATH=$(ls target/ai-pof-*.jar | grep -v 'original-' | head -n 1)
           cp "${JAR_PATH}" "target/ai-pof-${VERSION}.jar"
 
