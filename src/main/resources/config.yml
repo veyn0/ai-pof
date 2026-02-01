@@ -6,6 +6,21 @@ pillar-height: 64
 pillar-spacing: 6
 projectile-knockback-strength: 0.8
 block-exclusions:
+  - "*ARMOR_TRIM*"
+  - "*COMMAND_BLOCK*"
+  - "*DYE*"
+  - "*CANDLE*"
+  - "*BANNER*"
+  - "*HANGING_MOSS*"
+  - "*TULIP*"
+  - "*CORAL*"
+  - "*PAINTING*"
+  - "*ITEM_FRAME*"
+  - "*SIGN*"
+  - "*BOAT*"
+  - "*BUNDLE*"
+  - "*POTTERY*"
+  - "*BOOK*"
   # Eintrag ohne * => exakte Übereinstimmung (case-insensitive), z. B. "GLASS".
   # Eintrag mit * => contains-Match (case-insensitive), z. B. "*GLASS*".
 waiting-box:
