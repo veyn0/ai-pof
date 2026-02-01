@@ -26,6 +26,7 @@ public class Round {
     private final List<Material> itemPool;
     private final Map<UUID, Location> waitingBoxSpawns = new HashMap<>();
     private final List<WaitingBox> waitingBoxes = new ArrayList<>();
+    private final RoundStateMachine stateMachine = new RoundStateMachine();
     private RoundState state = RoundState.WAITING;
     private World world;
 
@@ -49,20 +50,33 @@ public class Round {
         return world;
     }
 
-    public void markStarted() {
-        state = RoundState.RUNNING;
+    public boolean transitionTo(RoundState target) {
+        if (state == target) {
+            return false;
+        }
+        stateMachine.assertTransition(state, target);
+        state = target;
+        return true;
     }
 
-    public void markEnded() {
-        state = RoundState.ENDED;
+    public boolean canTransitionTo(RoundState target) {
+        return stateMachine.canTransition(state, target);
     }
 
-    public boolean isStarted() {
+    public boolean isRunning() {
         return state == RoundState.RUNNING;
     }
 
     public boolean isEnded() {
         return state == RoundState.ENDED;
+    }
+
+    public boolean isWaitingForStart() {
+        return state == RoundState.WAITING || state == RoundState.COUNTDOWN;
+    }
+
+    public boolean isCountingDown() {
+        return state == RoundState.COUNTDOWN;
     }
 
     public RoundState getState() {
