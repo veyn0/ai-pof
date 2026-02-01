@@ -225,6 +225,11 @@ public class RoundLifecycleHandler {
         player.setInvulnerable(true);
     }
 
+    public void applyWaitingSettings(Player player) {
+        player.setGameMode(GameMode.ADVENTURE);
+        player.setInvulnerable(true);
+    }
+
     public void buildWaitingBoxes(Round round) {
         spawnService.buildWaitingBoxes(round, round.getParticipants());
         for (UUID uuid : round.getParticipants()) {
@@ -313,7 +318,7 @@ public class RoundLifecycleHandler {
             buildWaitingBoxes(newRound);
             maybeStartCountdown(newRound);
             for (Player player : addedPlayers) {
-                applySpectatorSettings(player);
+                applyWaitingSettings(player);
             }
         }
         if (endedRound != null) {
