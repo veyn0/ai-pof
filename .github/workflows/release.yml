@@ -35,25 +35,48 @@ jobs:
       - name: Resolve release tag
         id: release_tag
         run: |
+          MC_VERSION=$(python - <<'PY'
+          import xml.etree.ElementTree as ET
+          tree = ET.parse("pom.xml")
+          root = tree.getroot()
+          ns = {"m": "http://maven.apache.org/POM/4.0.0"}
+          version = None
+          for dep in root.findall(".//m:dependency", ns):
+              artifact = dep.find("m:artifactId", ns)
+              if artifact is not None and artifact.text == "paper-api":
+                  version_text = dep.findtext("m:version", default="", namespaces=ns)
+                  version = version_text.split("-", 1)[0]
+                  break
+          if not version:
+              raise SystemExit("paper-api version not found in pom.xml")
+          print(version)
+          PY
+          )
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
           else
             TAG="${GITHUB_REF_NAME}"
           fi
-          if [[ ! "${TAG}" =~ ^v ]]; then
-            echo "Release tag must start with 'v'." >&2
-            exit 1
+          TAG_VALUE="${TAG#v}"
+          if [[ "${TAG_VALUE}" == "${MC_VERSION}"-* ]]; then
+            FULL_TAG="v${TAG_VALUE}"
+            VERSION="${TAG_VALUE}"
+          else
+            FULL_TAG="v${MC_VERSION}-${TAG_VALUE}"
+            VERSION="${MC_VERSION}-${TAG_VALUE}"
           fi
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "tag=${FULL_TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Rename jar with version
         run: |
-          TAG="${{ steps.release_tag.outputs.tag }}"
-          VERSION="${TAG#v}"
+          VERSION="${{ steps.release_tag.outputs.version }}"
           JAR_PATH=$(ls target/ai-pof-*.jar | grep -v 'original-' | head -n 1)
           cp "${JAR_PATH}" "target/ai-pof-${VERSION}.jar"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ steps.release_tag.outputs.tag }}
+          name: ${{ steps.release_tag.outputs.tag }}
           files: target/ai-pof-*.jar
