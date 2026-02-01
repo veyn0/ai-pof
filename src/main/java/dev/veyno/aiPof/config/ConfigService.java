@@ -47,6 +47,10 @@ public class ConfigService {
         return config.getItemCount().baseWeight();
     }
 
+    public double getProjectileKnockbackStrength() {
+        return config.getProjectileKnockbackStrength();
+    }
+
     public int getWaitingBoxRadius() {
         return config.getWaitingBox().radius();
     }

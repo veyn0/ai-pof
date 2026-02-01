@@ -24,6 +24,7 @@ public final class GameConfig {
     private static final boolean DEFAULT_ITEM_COUNT_ENABLED = true;
     private static final int DEFAULT_ITEM_COUNT_MAX = 3;
     private static final double DEFAULT_ITEM_COUNT_BASE_WEIGHT = 1.0;
+    private static final double DEFAULT_PROJECTILE_KNOCKBACK_STRENGTH = 0.8;
     private static final List<String> DEFAULT_BLOCK_EXCLUSIONS = List.of();
 
     private final int minPlayers;
@@ -35,6 +36,7 @@ public final class GameConfig {
     private final WaitingBox waitingBox;
     private final StartBox startBox;
     private final ItemCount itemCount;
+    private final double projectileKnockbackStrength;
     private final List<String> blockExclusions;
 
     private GameConfig(
@@ -47,6 +49,7 @@ public final class GameConfig {
         WaitingBox waitingBox,
         StartBox startBox,
         ItemCount itemCount,
+        double projectileKnockbackStrength,
         List<String> blockExclusions
     ) {
         this.minPlayers = minPlayers;
@@ -58,6 +61,7 @@ public final class GameConfig {
         this.waitingBox = waitingBox;
         this.startBox = startBox;
         this.itemCount = itemCount;
+        this.projectileKnockbackStrength = projectileKnockbackStrength;
         this.blockExclusions = List.copyOf(blockExclusions);
     }
 
@@ -93,6 +97,13 @@ public final class GameConfig {
         WaitingBox waitingBox = loadWaitingBox(config, logger);
         StartBox startBox = loadStartBox(config, logger);
         ItemCount itemCount = loadItemCount(config, logger);
+        double projectileKnockbackStrength = readPositiveDouble(
+            config,
+            logger,
+            "projectile-knockback-strength",
+            DEFAULT_PROJECTILE_KNOCKBACK_STRENGTH,
+            0.0
+        );
         List<String> blockExclusions = readStringList(config, logger, "block-exclusions", DEFAULT_BLOCK_EXCLUSIONS);
 
         return new GameConfig(
@@ -105,6 +116,7 @@ public final class GameConfig {
             waitingBox,
             startBox,
             itemCount,
+            projectileKnockbackStrength,
             blockExclusions
         );
     }
@@ -143,6 +155,10 @@ public final class GameConfig {
 
     public ItemCount getItemCount() {
         return itemCount;
+    }
+
+    public double getProjectileKnockbackStrength() {
+        return projectileKnockbackStrength;
     }
 
     public List<String> getBlockExclusions() {
@@ -239,6 +255,25 @@ public final class GameConfig {
             return defaultValue;
         }
         return section.getInt(key, defaultValue);
+    }
+
+    private static double readPositiveDouble(
+        FileConfiguration config,
+        Logger logger,
+        String path,
+        double defaultValue,
+        double min
+    ) {
+        if (!config.contains(path)) {
+            warnMissing(logger, path, defaultValue);
+            return defaultValue;
+        }
+        double value = config.getDouble(path, defaultValue);
+        if (value <= min) {
+            warnInvalid(logger, path, value, defaultValue);
+            return defaultValue;
+        }
+        return value;
     }
 
     private static double readPositiveDouble(

@@ -4,6 +4,7 @@ item-interval-seconds: 10
 round-restart-cooldown-seconds: 5
 pillar-height: 64
 pillar-spacing: 6
+projectile-knockback-strength: 0.8
 block-exclusions:
   # Eintrag ohne * => exakte Übereinstimmung (case-insensitive), z. B. "GLASS".
   # Eintrag mit * => contains-Match (case-insensitive), z. B. "*GLASS*".
