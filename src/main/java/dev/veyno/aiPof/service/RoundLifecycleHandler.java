@@ -205,13 +205,19 @@ public class RoundLifecycleHandler {
     }
 
     public void resetPlayerState(Player player) {
-        PlayerInventory inventory = player.getInventory();
-        inventory.clear();
+        clearPlayerState(player);
         player.setHealth(player.getMaxHealth());
         player.setFoodLevel(20);
         player.setSaturation(20f);
         player.setGameMode(GameMode.SURVIVAL);
         player.setInvulnerable(true);
+    }
+
+    public void resetPlayerStateForEnd(Player player) {
+        clearPlayerState(player);
+        player.setHealth(player.getMaxHealth());
+        player.setFoodLevel(20);
+        player.setSaturation(20f);
     }
 
     public void applySpectatorSettings(Player player) {
@@ -387,7 +393,7 @@ public class RoundLifecycleHandler {
             for (UUID uuid : new HashSet<>(round.getParticipants())) {
                 Player player = Bukkit.getPlayer(uuid);
                 if (player != null) {
-                    player.getInventory().clear();
+                    resetPlayerStateForEnd(player);
                     player.setInvulnerable(false);
                     player.setGameMode(GameMode.SURVIVAL);
                     Location spawn = mainWorld.getSpawnLocation();
@@ -400,7 +406,7 @@ public class RoundLifecycleHandler {
             for (UUID uuid : new HashSet<>(round.getParticipants())) {
                 Player player = Bukkit.getPlayer(uuid);
                 if (player != null) {
-                    player.getInventory().clear();
+                    resetPlayerStateForEnd(player);
                     applySpectatorSettings(player);
                     if (spectatorSpawn != null) {
                         boolean success = player.teleport(spectatorSpawn);
@@ -494,6 +500,21 @@ public class RoundLifecycleHandler {
         int next = roundCounters.getOrDefault(baseId, 1) + 1;
         roundCounters.put(baseId, next);
         return baseId + "-" + next;
+    }
+
+    private void clearPlayerState(Player player) {
+        PlayerInventory inventory = player.getInventory();
+        inventory.clear();
+        inventory.setArmorContents(null);
+        inventory.setItemInOffHand(null);
+        for (PotionEffect effect : player.getActivePotionEffects()) {
+            player.removePotionEffect(effect.getType());
+        }
+        player.setExp(0f);
+        player.setLevel(0);
+        player.setTotalExperience(0);
+        player.setFireTicks(0);
+        player.getEnderChest().clear();
     }
 
     private static class RoundTasks {
