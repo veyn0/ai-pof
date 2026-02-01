@@ -4,6 +4,8 @@ import dev.veyno.aiPof.domain.Round;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
@@ -16,7 +18,10 @@ import org.bukkit.WorldCreator;
 import org.bukkit.generator.ChunkGenerator;
 
 public class WorldService {
+    private final Logger logger = Bukkit.getLogger();
+
     public World createWorld(String worldName) {
+        logger.info(() -> "world-create start name=" + worldName);
         WorldCreator creator = new WorldCreator(worldName)
             .generator(new ChunkGenerator() {
                 @Override
@@ -27,12 +32,14 @@ public class WorldService {
             .generateStructures(false);
         World world = Bukkit.createWorld(creator);
         if (world == null) {
+            logger.severe(() -> "world-create failed name=" + worldName);
             throw new IllegalStateException("Konnte Welt nicht erstellen.");
         }
         world.setDifficulty(Difficulty.EASY);
         world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
         world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
         world.setTime(6000);
+        logger.info(() -> "world-create ready name=" + worldName);
         return world;
     }
 
@@ -41,6 +48,7 @@ public class WorldService {
             return;
         }
         String name = world.getName();
+        logger.info(() -> "world-cleanup start name=" + name);
         Bukkit.unloadWorld(world, false);
         File folder = new File(Bukkit.getWorldContainer(), name);
         deleteWorldFolder(folder);
@@ -85,9 +93,11 @@ public class WorldService {
                     try {
                         Files.deleteIfExists(path);
                     } catch (IOException ignored) {
+                        logger.log(Level.WARNING, "world-cleanup delete-failed path=" + path, ignored);
                     }
                 });
-        } catch (IOException ignored) {
+        } catch (IOException ex) {
+            logger.log(Level.SEVERE, "world-cleanup scan-failed path=" + folder.getAbsolutePath(), ex);
         }
     }
 }

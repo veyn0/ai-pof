@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import java.util.logging.Logger;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
@@ -36,6 +37,7 @@ public class RoundLifecycleHandler {
     private final Map<String, Round> endedRounds;
     private final Map<String, Integer> roundCounters;
     private final Map<String, RoundTasks> roundTasks = new HashMap<>();
+    private final Logger logger;
 
     public RoundLifecycleHandler(
         AiPof plugin,
@@ -49,6 +51,7 @@ public class RoundLifecycleHandler {
         Map<String, Integer> roundCounters
     ) {
         this.plugin = plugin;
+        this.logger = plugin.getLogger();
         this.config = config;
         this.worldService = worldService;
         this.spawnService = spawnService;
@@ -106,13 +109,24 @@ public class RoundLifecycleHandler {
 
     public void startRound(Round round) {
         if (!round.isWaitingForStart() || !round.canTransitionTo(RoundState.STARTING)) {
+            logger.fine(() -> "round-start skipped reason=invalid-state state=" + round.getState());
             return;
         }
         String roundId = findRoundId(round);
         if (roundId == null) {
+            logger.warning("round-start aborted reason=missing-round-id");
+            return;
+        }
+        if (round.getParticipants().isEmpty()) {
+            logger.warning(() -> "round-start aborted reason=no-participants roundId=" + roundId);
+            return;
+        }
+        if (round.getWorld() == null) {
+            logger.warning(() -> "round-start aborted reason=missing-world roundId=" + roundId);
             return;
         }
         round.transitionTo(RoundState.STARTING);
+        logger.info(() -> "round-start begin roundId=" + roundId + " participants=" + round.getParticipants().size());
         RoundTasks tasks = roundTasks.computeIfAbsent(roundId, key -> new RoundTasks());
         if (tasks.countdownTask != null) {
             tasks.countdownTask.cancel();
@@ -129,6 +143,11 @@ public class RoundLifecycleHandler {
             }
         }
         Map<UUID, Location> startSpawns = spawnService.teleportParticipantsToStart(round, round.getParticipants());
+        if (startSpawns.isEmpty()) {
+            logger.warning(() -> "round-start teleport-none roundId=" + roundId);
+        } else {
+            logger.info(() -> "round-start teleported participants=" + startSpawns.size() + " roundId=" + roundId);
+        }
         spawnService.clearWaitingBoxes(round);
         scheduleStartTeleportCheck(round, startSpawns);
         for (UUID uuid : round.getParticipants()) {
@@ -141,6 +160,7 @@ public class RoundLifecycleHandler {
         round.transitionTo(RoundState.RUNNING);
         scheduleItemDrops(round);
         broadcast(round, "round-started");
+        logger.info(() -> "round-start done roundId=" + roundId + " world=" + round.getWorldName());
     }
 
     public void checkForWinner(Round round) {
@@ -205,7 +225,10 @@ public class RoundLifecycleHandler {
             Player player = Bukkit.getPlayer(uuid);
             Location spawn = round.getWaitingBoxSpawns().get(uuid);
             if (player != null && spawn != null) {
-                player.teleport(spawn);
+                boolean success = player.teleport(spawn);
+                logTeleport("waiting-box", player, spawn, success);
+            } else if (player != null) {
+                logger.warning(() -> "teleport skipped reason=missing-spawn player=" + player.getName());
             }
         }
     }
@@ -249,15 +272,21 @@ public class RoundLifecycleHandler {
     }
 
     public void restartRound(String baseId) {
+        if (baseId == null || baseId.isBlank()) {
+            logger.warning("round-restart aborted reason=missing-base-id");
+            return;
+        }
         Set<UUID> remaining = roundRepository.pendingParticipants().remove(baseId);
         restartTasks.remove(baseId);
         Round endedRound = endedRounds.remove(baseId);
         if (remaining == null || remaining.isEmpty()) {
+            logger.info(() -> "round-restart skipped reason=no-pending baseId=" + baseId);
             if (endedRound != null) {
                 worldService.cleanupWorld(endedRound.getWorld());
             }
             return;
         }
+        logger.info(() -> "round-restart begin baseId=" + baseId + " participants=" + remaining.size());
         String nextRoundId = nextRoundId(baseId);
         Round newRound = createRound(nextRoundId);
         Set<Player> addedPlayers = new HashSet<>();
@@ -271,6 +300,7 @@ public class RoundLifecycleHandler {
                 roundRepository.playerRounds().put(uuid, nextRoundId);
             } else {
                 roundRepository.playerRounds().remove(uuid);
+                logger.info(() -> "round-restart removed-offline player=" + uuid + " baseId=" + baseId);
             }
         }
         if (!addedPlayers.isEmpty()) {
@@ -283,12 +313,14 @@ public class RoundLifecycleHandler {
         if (endedRound != null) {
             worldService.cleanupWorld(endedRound.getWorld());
         }
+        logger.info(() -> "round-restart done baseId=" + baseId + " newRoundId=" + nextRoundId);
     }
 
     public Round createRound(String id) {
         RoundId roundId = RoundId.fromRaw(id);
         Round existing = roundRepository.rounds().get(roundId.value());
         if (existing != null && !existing.isEnded()) {
+            logger.warning(() -> "round-create rejected reason=active-round roundId=" + roundId.value());
             throw new IllegalStateException("Eine Runde mit dieser ID läuft bereits.");
         }
         roundRepository.rounds().remove(roundId.value());
@@ -296,6 +328,7 @@ public class RoundLifecycleHandler {
         round.setWorld(worldService.createWorld(round.getWorldName()));
         roundRepository.rounds().put(roundId.value(), round);
         registerRoundId(roundId);
+        logger.info(() -> "round-create done roundId=" + roundId.value() + " world=" + round.getWorldName());
         return round;
     }
 
@@ -323,9 +356,13 @@ public class RoundLifecycleHandler {
         }
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             if (!round.isRunning() && !round.isWaitingForStart()) {
+                String roundId = findRoundId(round);
+                logger.fine(() -> "round-start delayed-teleport skipped reason=state roundId=" + roundId);
                 return;
             }
             spawnService.teleportParticipantsToStartDelayed(round.getParticipants(), startSpawns);
+            String roundId = findRoundId(round);
+            logger.info(() -> "round-start delayed-teleport scheduled count=" + startSpawns.size() + " roundId=" + roundId);
         }, delayTicks);
     }
 
@@ -353,7 +390,9 @@ public class RoundLifecycleHandler {
                     player.getInventory().clear();
                     player.setInvulnerable(false);
                     player.setGameMode(GameMode.SURVIVAL);
-                    player.teleport(mainWorld.getSpawnLocation());
+                    Location spawn = mainWorld.getSpawnLocation();
+                    boolean success = player.teleport(spawn);
+                    logTeleport("cleanup", player, spawn, success);
                 }
             }
         } else {
@@ -364,7 +403,10 @@ public class RoundLifecycleHandler {
                     player.getInventory().clear();
                     applySpectatorSettings(player);
                     if (spectatorSpawn != null) {
-                        player.teleport(spectatorSpawn);
+                        boolean success = player.teleport(spectatorSpawn);
+                        logTeleport("spectator", player, spectatorSpawn, success);
+                    } else {
+                        logger.warning(() -> "teleport skipped reason=missing-spectator-spawn player=" + player.getName());
                     }
                 }
             }
@@ -387,6 +429,25 @@ public class RoundLifecycleHandler {
         round.clearParticipants();
         if (round.canTransitionTo(RoundState.ENDED)) {
             round.transitionTo(RoundState.ENDED);
+        }
+    }
+
+    private void logTeleport(String reason, Player player, Location target, boolean success) {
+        if (player == null || target == null) {
+            logger.warning(() -> "teleport failed reason=" + reason + " missing-data");
+            return;
+        }
+        String message = "teleport result=" + success
+            + " reason=" + reason
+            + " player=" + player.getName()
+            + " world=" + target.getWorld().getName()
+            + " x=" + target.getBlockX()
+            + " y=" + target.getBlockY()
+            + " z=" + target.getBlockZ();
+        if (success) {
+            logger.info(message);
+        } else {
+            logger.warning(message);
         }
     }
 
