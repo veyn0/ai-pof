@@ -1,75 +1,77 @@
 package dev.veyno.aiPof.config;
 
-import org.bukkit.plugin.java.JavaPlugin;
-
 public class ConfigService {
-    private final JavaPlugin plugin;
+    private final GameConfig config;
 
-    public ConfigService(JavaPlugin plugin) {
-        this.plugin = plugin;
+    public ConfigService(GameConfig config) {
+        this.config = config;
     }
 
     public int getMinPlayers() {
-        return plugin.getConfig().getInt("min-players", 2);
+        return config.getMinPlayers();
     }
 
     public int getStartCountdownSeconds() {
-        return plugin.getConfig().getInt("start-countdown-seconds", 10);
+        return config.getStartCountdownSeconds();
     }
 
     public int getPillarHeight() {
-        return plugin.getConfig().getInt("pillar-height", 64);
+        return config.getPillarHeight();
     }
 
     public int getPillarSpacing() {
-        return plugin.getConfig().getInt("pillar-spacing", 6);
+        return config.getPillarSpacing();
     }
 
     public int getItemIntervalSeconds() {
-        return plugin.getConfig().getInt("item-interval-seconds", 10);
+        return config.getItemIntervalSeconds();
+    }
+
+    public int getRoundRestartCooldownSeconds() {
+        return config.getRoundRestartCooldownSeconds();
     }
 
     public boolean isItemCountEnabled() {
-        return plugin.getConfig().getBoolean("item-count.enabled", true);
+        return config.getItemCount().enabled();
     }
 
     public int getItemCountMax() {
-        return plugin.getConfig().getInt("item-count.max", 1);
+        return config.getItemCount().max();
     }
 
     public double getItemCountBaseWeight() {
-        return plugin.getConfig().getDouble("item-count.base-weight", 1.0);
+        return config.getItemCount().baseWeight();
     }
 
     public int getWaitingBoxRadius() {
-        return plugin.getConfig().getInt("waiting-box.radius", 6);
+        return config.getWaitingBox().radius();
     }
 
     public int getWaitingBoxHeight() {
-        return plugin.getConfig().getInt("waiting-box.height", 3);
+        return config.getWaitingBox().height();
     }
 
     public int getWaitingBoxYOffset() {
-        return plugin.getConfig().getInt("waiting-box.y-offset", 4);
+        return config.getWaitingBox().yOffset();
     }
 
     public int getWaitingBoxCenterX() {
-        return plugin.getConfig().getInt("waiting-box.center-x", 0);
+        return config.getWaitingBox().centerX();
     }
 
     public int getWaitingBoxCenterZ() {
-        return plugin.getConfig().getInt("waiting-box.center-z", 0);
+        return config.getWaitingBox().centerZ();
     }
 
     public int getStartBoxRadius() {
-        return plugin.getConfig().getInt("start-box.radius", 1);
+        return config.getStartBox().radius();
     }
 
     public int getStartBoxHeight() {
-        return plugin.getConfig().getInt("start-box.height", 2);
+        return config.getStartBox().height();
     }
 
     public int getStartBoxYOffset() {
-        return plugin.getConfig().getInt("start-box.y-offset", 2);
+        return config.getStartBox().yOffset();
     }
 }

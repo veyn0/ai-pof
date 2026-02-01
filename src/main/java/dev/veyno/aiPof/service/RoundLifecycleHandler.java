@@ -25,8 +25,6 @@ import org.bukkit.potion.PotionEffectType;
 import org.bukkit.scheduler.BukkitTask;
 
 public class RoundLifecycleHandler {
-    private static final int RESTART_DELAY_SECONDS = 5;
-
     private final AiPof plugin;
     private final ConfigService config;
     private final WorldService worldService;
@@ -247,10 +245,12 @@ public class RoundLifecycleHandler {
             Player player = Bukkit.getPlayer(uuid);
             if (player != null) {
                 playerRounds.put(uuid, baseId);
-                plugin.sendMessage(player, "round-restart", Map.of("seconds", Integer.toString(RESTART_DELAY_SECONDS)));
+                int restartDelay = config.getRoundRestartCooldownSeconds();
+                plugin.sendMessage(player, "round-restart", Map.of("seconds", Integer.toString(restartDelay)));
             }
         }
-        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> restartRound(baseId), RESTART_DELAY_SECONDS * 20L);
+        int restartDelay = config.getRoundRestartCooldownSeconds();
+        BukkitTask task = Bukkit.getScheduler().runTaskLater(plugin, () -> restartRound(baseId), restartDelay * 20L);
         restartTasks.put(baseId, task);
     }
 
