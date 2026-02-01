@@ -65,6 +65,14 @@ jobs:
             FULL_TAG="v${MC_VERSION}-${TAG_VALUE}"
             VERSION="${MC_VERSION}-${TAG_VALUE}"
           fi
+          TAG_VALUE="${TAG#v}"
+          if [[ "${TAG_VALUE}" == "${MC_VERSION}"-* ]]; then
+            FULL_TAG="v${TAG_VALUE}"
+            VERSION="${TAG_VALUE}"
+          else
+            FULL_TAG="v${MC_VERSION}-${TAG_VALUE}"
+            VERSION="${MC_VERSION}-${TAG_VALUE}"
+          fi
           echo "tag=${FULL_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 

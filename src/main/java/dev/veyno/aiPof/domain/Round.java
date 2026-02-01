@@ -144,8 +144,11 @@ public class Round {
         return random;
     }
 
-    public boolean isWaitingBoxBlock(Block block) {
+    public boolean isWaitingBoxBlock(Block block, BlockExclusions exclusions) {
         if (block == null || world == null || !block.getWorld().equals(world)) {
+            return false;
+        }
+        if (exclusions != null && exclusions.matches(block.getType().name())) {
             return false;
         }
         for (WaitingBox box : waitingBoxes) {

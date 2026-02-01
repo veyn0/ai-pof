@@ -1,10 +1,14 @@
 package dev.veyno.aiPof.config;
 
+import dev.veyno.aiPof.domain.BlockExclusions;
+
 public class ConfigService {
     private final GameConfig config;
+    private final BlockExclusions blockExclusions;
 
     public ConfigService(GameConfig config) {
         this.config = config;
+        this.blockExclusions = new BlockExclusions(config.getBlockExclusions());
     }
 
     public int getMinPlayers() {
@@ -43,6 +47,10 @@ public class ConfigService {
         return config.getItemCount().baseWeight();
     }
 
+    public double getProjectileKnockbackStrength() {
+        return config.getProjectileKnockbackStrength();
+    }
+
     public int getWaitingBoxRadius() {
         return config.getWaitingBox().radius();
     }
@@ -73,5 +81,9 @@ public class ConfigService {
 
     public int getStartBoxYOffset() {
         return config.getStartBox().yOffset();
+    }
+
+    public BlockExclusions getBlockExclusions() {
+        return blockExclusions;
     }
 }
