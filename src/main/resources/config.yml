@@ -72,6 +72,7 @@ messages:
   joined: "<green>Du bist dem Wartebereich beigetreten.</green>"
   left: "<yellow>Du hast die Runde verlassen.</yellow>"
   eliminated: "<red>Du bist ausgeschieden.</red>"
+  ender-chest-blocked: "<red>Enderchest ist während der Runde deaktiviert.</red>"
   round-already-started: "<yellow>Die Runde läuft bereits.</yellow>"
   no-players-waiting: "<red>Keine Spieler im Wartebereich.</red>"
   round-started: "<gold>Pillars of Fortune gestartet! Viel Glück.</gold>"

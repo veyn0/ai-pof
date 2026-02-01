@@ -28,9 +28,11 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
+import org.bukkit.inventory.InventoryType;
 import org.bukkit.scheduler.BukkitTask;
 
 public class RoundService implements Listener {
@@ -181,6 +183,22 @@ public class RoundService implements Listener {
             event.setCancelled(true);
             player.setFireTicks(0);
         }
+    }
+
+    @EventHandler
+    public void onInventoryOpen(InventoryOpenEvent event) {
+        if (!(event.getPlayer() instanceof Player player)) {
+            return;
+        }
+        Round round = getPlayerRound(player);
+        if (round == null || !round.isParticipant(player.getUniqueId())) {
+            return;
+        }
+        if (event.getInventory().getType() != InventoryType.ENDER_CHEST) {
+            return;
+        }
+        event.setCancelled(true);
+        plugin.sendMessage(player, "ender-chest-blocked");
     }
 
     @EventHandler
