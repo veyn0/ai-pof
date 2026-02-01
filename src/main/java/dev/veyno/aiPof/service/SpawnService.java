@@ -138,7 +138,7 @@ public class SpawnService {
             for (int y = 0; y <= height; y++) {
                 world.getBlockAt(x, y, z).setType(Material.BEDROCK);
             }
-            round.getPillarAssignments().put(uuid, index);
+            round.assignPillar(uuid, index);
         }
     }
 

@@ -3,7 +3,6 @@ package dev.veyno.aiPof.domain;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -20,11 +19,9 @@ public class Round {
     public static final String WORLD_PREFIX = "pof_round_";
     private final String worldName;
     private final Random random = new Random();
-    private final Set<UUID> participants = new HashSet<>();
-    private final Set<UUID> alivePlayers = new HashSet<>();
-    private final Map<UUID, Integer> pillarAssignments = new HashMap<>();
+    private final ParticipantRegistry participantRegistry = new ParticipantRegistry();
     private final List<Material> itemPool;
-    private final Map<UUID, Location> waitingBoxSpawns = new HashMap<>();
+    private final Map<UUID, Location> waitingBoxSpawns = new java.util.HashMap<>();
     private final List<WaitingBox> waitingBoxes = new ArrayList<>();
     private final RoundStateMachine stateMachine = new RoundStateMachine();
     private RoundState state = RoundState.WAITING;
@@ -84,48 +81,46 @@ public class Round {
     }
 
     public void addParticipant(UUID uuid) {
-        participants.add(uuid);
-        alivePlayers.add(uuid);
+        Participant participant = participantRegistry.add(uuid);
+        participant.setAlive(true);
+        participant.setStatus(ParticipantStatus.WAITING);
+        participant.setPillarIndex(null);
     }
 
     public void removeParticipant(UUID uuid) {
-        participants.remove(uuid);
-        alivePlayers.remove(uuid);
-        pillarAssignments.remove(uuid);
+        participantRegistry.remove(uuid);
     }
 
     public void removeAlive(UUID uuid) {
-        alivePlayers.remove(uuid);
+        participantRegistry.markAlive(uuid, false);
     }
 
     public void clearParticipants() {
-        participants.clear();
-        alivePlayers.clear();
-        pillarAssignments.clear();
+        participantRegistry.clear();
     }
 
     public boolean isParticipant(UUID uuid) {
-        return participants.contains(uuid);
+        return participantRegistry.contains(uuid);
     }
 
     public boolean isAlive(UUID uuid) {
-        return alivePlayers.contains(uuid);
+        return participantRegistry.isAlive(uuid);
     }
 
     public Set<UUID> getParticipants() {
-        return new HashSet<>(participants);
+        return participantRegistry.getParticipantIds();
     }
 
     public Set<UUID> getAlivePlayers() {
-        return new HashSet<>(alivePlayers);
+        return participantRegistry.getAliveParticipantIds();
     }
 
-    public Set<UUID> getAlivePlayersMutable() {
-        return alivePlayers;
+    public void markAllParticipantsActive() {
+        participantRegistry.markAllActive();
     }
 
-    public Map<UUID, Integer> getPillarAssignments() {
-        return pillarAssignments;
+    public void assignPillar(UUID uuid, int index) {
+        participantRegistry.setPillarIndex(uuid, index);
     }
 
     public Map<UUID, Location> getWaitingBoxSpawns() {
