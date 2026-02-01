@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.21.8-3)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -27,7 +32,51 @@ jobs:
       - name: Build with Maven
         run: mvn -B package
 
+      - name: Resolve release tag
+        id: release_tag
+        run: |
+          PAPER_VERSION=$(python - <<'PY'
+import xml.etree.ElementTree as ET
+tree = ET.parse("pom.xml")
+root = tree.getroot()
+ns = {"m": "http://maven.apache.org/POM/4.0.0"}
+for dep in root.findall(".//m:dependencies/m:dependency", ns):
+    artifact_id = dep.find("m:artifactId", ns)
+    if artifact_id is not None and artifact_id.text == "paper-api":
+        version = dep.find("m:version", ns)
+        if version is not None and version.text:
+            print(version.text.strip())
+            break
+PY
+          )
+          if [ -z "${PAPER_VERSION}" ]; then
+            echo "Unable to determine paper-api version from pom.xml." >&2
+            exit 1
+          fi
+          MINECRAFT_VERSION="${PAPER_VERSION%%-R*}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF_NAME}"
+          fi
+          if [[ ! "${TAG}" =~ ^v ]]; then
+            echo "Release tag must start with 'v'." >&2
+            exit 1
+          fi
+          if [ "${TAG}" != "v${MINECRAFT_VERSION}" ]; then
+            echo "Release tag must match the Paper API Minecraft version v${MINECRAFT_VERSION}." >&2
+            exit 1
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Rename jar with version
+        run: |
+          TAG="${{ steps.release_tag.outputs.tag }}"
+          VERSION="${TAG#v}"
+          JAR_PATH=$(ls target/ai-pof-*.jar | grep -v 'original-' | head -n 1)
+          cp "${JAR_PATH}" "target/ai-pof-${VERSION}.jar"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: target/*.jar
+          files: target/ai-pof-*.jar
