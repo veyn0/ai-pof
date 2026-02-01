@@ -189,14 +189,12 @@ public class RoundService implements Listener {
         if (round == null) {
             return;
         }
-        if (round.isParticipant(event.getPlayer().getUniqueId()) && round.isRunning()) {
-            if (!round.isAlive(event.getPlayer().getUniqueId())) {
-                Location spectatorSpawn = spawnService.getSpectatorSpawn(round);
-                if (spectatorSpawn != null) {
-                    event.setRespawnLocation(spectatorSpawn);
-                }
-                Bukkit.getScheduler().runTask(plugin, () -> lifecycleHandler.applySpectatorSettings(event.getPlayer()));
+        if (round.isParticipant(event.getPlayer().getUniqueId()) && !round.isAlive(event.getPlayer().getUniqueId())) {
+            Location spectatorSpawn = spawnService.getSpectatorSpawn(round);
+            if (spectatorSpawn != null) {
+                event.setRespawnLocation(spectatorSpawn);
             }
+            Bukkit.getScheduler().runTask(plugin, () -> lifecycleHandler.applySpectatorSettings(event.getPlayer()));
         }
     }
 
@@ -305,6 +303,29 @@ public class RoundService implements Listener {
         player.getInventory().clear();
         player.setInvulnerable(true);
         lifecycleHandler.applySpectatorSettings(player);
+        Bukkit.getScheduler().runTask(plugin, () -> {
+            Round currentRound = getPlayerRound(player);
+            if (currentRound == null) {
+                return;
+            }
+            if (!currentRound.isParticipant(player.getUniqueId())) {
+                return;
+            }
+            if (currentRound.isAlive(player.getUniqueId())) {
+                return;
+            }
+            Location spectatorSpawn = spawnService.getSpectatorSpawn(currentRound);
+            if (spectatorSpawn != null) {
+                boolean success = player.teleport(spectatorSpawn);
+                logger.info(() -> "teleport result=" + success
+                    + " reason=death-spectator-spawn player=" + player.getName()
+                    + " world=" + spectatorSpawn.getWorld().getName()
+                    + " x=" + spectatorSpawn.getBlockX()
+                    + " y=" + spectatorSpawn.getBlockY()
+                    + " z=" + spectatorSpawn.getBlockZ());
+            }
+            lifecycleHandler.applySpectatorSettings(player);
+        });
         lifecycleHandler.checkForWinner(round);
     }
 
