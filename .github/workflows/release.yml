@@ -2,14 +2,7 @@ name: Build and Release
 
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g. v1.21.8-3)'
-        required: true
-        type: string
+  pull_request:
 
 permissions:
   contents: write
@@ -35,6 +28,7 @@ jobs:
       - name: Resolve release tag
         id: release_tag
         run: |
+          RUN_NUMBER="${{ github.run_number }}"
           MC_VERSION=$(python - <<'PY'
           import xml.etree.ElementTree as ET
           tree = ET.parse("pom.xml")
@@ -52,27 +46,8 @@ jobs:
           print(version)
           PY
           )
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-          else
-            TAG="${GITHUB_REF_NAME}"
-          fi
-          TAG_VALUE="${TAG#v}"
-          if [[ "${TAG_VALUE}" == "${MC_VERSION}"-* ]]; then
-            FULL_TAG="v${TAG_VALUE}"
-            VERSION="${TAG_VALUE}"
-          else
-            FULL_TAG="v${MC_VERSION}-${TAG_VALUE}"
-            VERSION="${MC_VERSION}-${TAG_VALUE}"
-          fi
-          TAG_VALUE="${TAG#v}"
-          if [[ "${TAG_VALUE}" == "${MC_VERSION}"-* ]]; then
-            FULL_TAG="v${TAG_VALUE}"
-            VERSION="${TAG_VALUE}"
-          else
-            FULL_TAG="v${MC_VERSION}-${TAG_VALUE}"
-            VERSION="${MC_VERSION}-${TAG_VALUE}"
-          fi
+          VERSION="${MC_VERSION}-${RUN_NUMBER}"
+          FULL_TAG="v${VERSION}"
           echo "tag=${FULL_TAG}" >> "$GITHUB_OUTPUT"
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
@@ -83,6 +58,7 @@ jobs:
           cp "${JAR_PATH}" "target/ai-pof-${VERSION}.jar"
 
       - name: Create GitHub Release
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release_tag.outputs.tag }}
