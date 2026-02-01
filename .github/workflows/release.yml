@@ -57,9 +57,13 @@ jobs:
           else
             TAG="${GITHUB_REF_NAME}"
           fi
-          if [[ ! "${TAG}" =~ ^v ]]; then
-            echo "Release tag must start with 'v'." >&2
-            exit 1
+          TAG_VALUE="${TAG#v}"
+          if [[ "${TAG_VALUE}" == "${MC_VERSION}"-* ]]; then
+            FULL_TAG="v${TAG_VALUE}"
+            VERSION="${TAG_VALUE}"
+          else
+            FULL_TAG="v${MC_VERSION}-${TAG_VALUE}"
+            VERSION="${MC_VERSION}-${TAG_VALUE}"
           fi
           TAG_VALUE="${TAG#v}"
           if [[ "${TAG_VALUE}" == "${MC_VERSION}"-* ]]; then
