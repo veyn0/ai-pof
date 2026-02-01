@@ -99,7 +99,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 Round roundInstance = round.get();
-                String statusKey = roundInstance.isStarted() ? "status-running" : "status-waiting";
+                String statusKey = roundInstance.isRunning() ? "status-running" : "status-waiting";
                 String statusTemplate = plugin.messageTemplate(statusKey);
                 plugin.sendMessage(sender, "status-line", Map.of("status", statusTemplate));
             }
@@ -115,7 +115,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     if (round == null) {
                         continue;
                     }
-                    String statusKey = round.isStarted() ? "status-running" : "status-waiting";
+                    String statusKey = round.isRunning() ? "status-running" : "status-waiting";
                     String statusTemplate = plugin.messageTemplate(statusKey);
                     plugin.sendMessage(sender, "list-entry", Map.of("id", id, "status", statusTemplate));
                 }
