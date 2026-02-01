@@ -1,5 +1,8 @@
-package dev.veyno.aiPof;
+package dev.veyno.aiPof.command;
 
+import dev.veyno.aiPof.AiPof;
+import dev.veyno.aiPof.domain.Round;
+import dev.veyno.aiPof.service.RoundService;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -13,11 +16,11 @@ import org.bukkit.entity.Player;
 
 public class PofCommand implements CommandExecutor, TabCompleter {
     private final AiPof plugin;
-    private final RoundManager roundManager;
+    private final RoundService roundService;
 
-    public PofCommand(AiPof plugin, RoundManager roundManager) {
+    public PofCommand(AiPof plugin, RoundService roundService) {
         this.plugin = plugin;
-        this.roundManager = roundManager;
+        this.roundService = roundService;
     }
 
     @Override
@@ -39,7 +42,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                 }
                 try {
                     String id = args[1];
-                    roundManager.createRound(id);
+                    roundService.createRound(id);
                     plugin.sendMessage(sender, "created", Map.of("id", id));
                 } catch (IllegalArgumentException ex) {
                     plugin.sendMessage(sender, "error", Map.of("message", Objects.toString(ex.getMessage(), "")));
@@ -56,7 +59,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     plugin.sendMessage(sender, "join-usage");
                     return true;
                 }
-                roundManager.join(player, args[1]);
+                roundService.join(player, args[1]);
             }
             case "leave" -> {
                 if (!(sender instanceof Player player)) {
@@ -64,9 +67,9 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 if (args.length >= 2) {
-                    roundManager.leave(player, args[1]);
+                    roundService.leave(player, args[1]);
                 } else {
-                    roundManager.leave(player);
+                    roundService.leave(player);
                 }
             }
             case "start" -> {
@@ -82,7 +85,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     plugin.sendMessage(sender, "start-usage");
                     return true;
                 }
-                roundManager.forceStart(player, args[1]);
+                roundService.forceStart(player, args[1]);
             }
             case "status" -> {
                 if (args.length < 2) {
@@ -90,7 +93,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     return true;
                 }
                 String id = args[1];
-                var round = roundManager.getRound(id);
+                var round = roundService.getRound(id);
                 if (round.isEmpty() || round.get().isEnded()) {
                     plugin.sendMessage(sender, "status-no-active");
                     return true;
@@ -101,14 +104,14 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                 plugin.sendMessage(sender, "status-line", Map.of("status", statusTemplate));
             }
             case "list" -> {
-                List<String> ids = roundManager.getRoundIds();
+                List<String> ids = roundService.getRoundIds();
                 if (ids.isEmpty()) {
                     plugin.sendMessage(sender, "list-none");
                     return true;
                 }
                 plugin.sendMessage(sender, "list-header");
                 for (String id : ids) {
-                    var round = roundManager.getRound(id).orElse(null);
+                    var round = roundService.getRound(id).orElse(null);
                     if (round == null) {
                         continue;
                     }
@@ -122,7 +125,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
                     plugin.sendMessage(sender, "no-permission");
                     return true;
                 }
-                int deleted = roundManager.cleanupUnusedWorldFolders();
+                int deleted = roundService.cleanupUnusedWorldFolders();
                 plugin.sendMessage(sender, "cleanup-done", Map.of("count", Integer.toString(deleted)));
             }
             default -> sendHelp(sender);
@@ -147,7 +150,7 @@ public class PofCommand implements CommandExecutor, TabCompleter {
             return Arrays.asList("create", "join", "leave", "start", "status", "list", "cleanup");
         }
         if (args.length == 2 && Arrays.asList("join", "leave", "start", "status").contains(args[0].toLowerCase())) {
-            return new ArrayList<>(roundManager.getRoundIds());
+            return new ArrayList<>(roundService.getRoundIds());
         }
         return List.of();
     }

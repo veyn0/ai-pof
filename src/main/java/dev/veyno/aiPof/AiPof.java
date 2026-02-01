@@ -1,36 +1,51 @@
 package dev.veyno.aiPof;
 
-import org.bukkit.Bukkit;
-import org.bukkit.command.CommandSender;
-import org.bukkit.plugin.java.JavaPlugin;
+import java.util.Map;
+import dev.veyno.aiPof.command.PofCommand;
+import dev.veyno.aiPof.config.ConfigService;
+import dev.veyno.aiPof.infrastructure.WorldService;
+import dev.veyno.aiPof.service.ItemService;
+import dev.veyno.aiPof.service.RoundService;
+import dev.veyno.aiPof.service.SpawnService;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
-import java.util.Map;
+import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
+import org.bukkit.plugin.java.JavaPlugin;
 
 public final class AiPof extends JavaPlugin {
-    private RoundManager roundManager;
+    private RoundService roundService;
+    private ConfigService configService;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        roundManager = new RoundManager(this);
-        PofCommand command = new PofCommand(this, roundManager);
+        configService = new ConfigService(this);
+        WorldService worldService = new WorldService();
+        SpawnService spawnService = new SpawnService(configService);
+        ItemService itemService = new ItemService(configService);
+        roundService = new RoundService(this, configService, worldService, spawnService, itemService);
+        PofCommand command = new PofCommand(this, roundService);
         getCommand("pof").setExecutor(command);
         getCommand("pof").setTabCompleter(command);
-        Bukkit.getPluginManager().registerEvents(roundManager, this);
+        Bukkit.getPluginManager().registerEvents(roundService, this);
     }
 
     @Override
     public void onDisable() {
-        if (roundManager != null) {
-            roundManager.shutdown();
+        if (roundService != null) {
+            roundService.shutdown();
         }
     }
 
-    public RoundManager getRoundManager() {
-        return roundManager;
+    public RoundService getRoundService() {
+        return roundService;
+    }
+
+    public ConfigService getConfigService() {
+        return configService;
     }
 
     public String messageTemplate(String key) {
