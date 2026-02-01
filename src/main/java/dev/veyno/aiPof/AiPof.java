@@ -3,6 +3,7 @@ package dev.veyno.aiPof;
 import java.util.Map;
 import dev.veyno.aiPof.command.PofCommand;
 import dev.veyno.aiPof.config.ConfigService;
+import dev.veyno.aiPof.config.GameConfig;
 import dev.veyno.aiPof.infrastructure.WorldService;
 import dev.veyno.aiPof.service.ItemService;
 import dev.veyno.aiPof.service.RoundService;
@@ -22,7 +23,8 @@ public final class AiPof extends JavaPlugin {
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        configService = new ConfigService(this);
+        GameConfig gameConfig = GameConfig.load(this);
+        configService = new ConfigService(gameConfig);
         WorldService worldService = new WorldService();
         SpawnService spawnService = new SpawnService(configService);
         ItemService itemService = new ItemService(configService);
