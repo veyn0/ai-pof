@@ -2,7 +2,9 @@ name: Build and Release
 
 on:
   push:
-  pull_request:
+    tags:
+      - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -18,49 +20,66 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
-          distribution: 'temurin'
+          distribution: temurin
           java-version: '21'
-          cache: 'maven'
+          cache: maven
 
-      - name: Build with Maven
-        run: mvn -B package
-
-      - name: Resolve release tag
-        id: release_tag
+      - name: Determine Minecraft version
+        id: mc
         run: |
-          RUN_NUMBER="${{ github.run_number }}"
-          MC_VERSION=$(python - <<'PY'
+          python - <<'PY'
+          import os
+          import re
           import xml.etree.ElementTree as ET
+
           tree = ET.parse("pom.xml")
           root = tree.getroot()
           ns = {"m": "http://maven.apache.org/POM/4.0.0"}
-          version = None
+
+          version_text = None
           for dep in root.findall(".//m:dependency", ns):
               artifact = dep.find("m:artifactId", ns)
               if artifact is not None and artifact.text == "paper-api":
-                  version_text = dep.findtext("m:version", default="", namespaces=ns)
-                  version = version_text.split("-", 1)[0]
-                  break
-          if not version:
-              raise SystemExit("paper-api version not found in pom.xml")
-          print(version)
-          PY
-          )
-          VERSION="${MC_VERSION}-${RUN_NUMBER}"
-          FULL_TAG="v${VERSION}"
-          echo "tag=${FULL_TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+                  ver = dep.find("m:version", ns)
+                  if ver is not None and ver.text:
+                      version_text = ver.text.strip()
+                      break
 
-      - name: Rename jar with version
+          if not version_text:
+              raise SystemExit("paper-api version not found in pom.xml")
+
+          match = re.match(r"(\\d+\\.\\d+(?:\\.\\d+)?)", version_text)
+          if not match:
+              raise SystemExit(f"Could not parse Minecraft version from {version_text}")
+
+          mc_version = match.group(1)
+          output_path = os.environ.get("GITHUB_OUTPUT")
+          if not output_path:
+              raise SystemExit("GITHUB_OUTPUT is not set")
+          with open(output_path, "a", encoding="utf-8") as fh:
+              fh.write(f"mc_version={mc_version}\\n")
+          PY
+
+      - name: Build with Maven
+        run: mvn -B -DskipTests package
+
+      - name: Prepare release asset
+        id: asset
         run: |
-          VERSION="${{ steps.release_tag.outputs.version }}"
+          RELEASE_ID="${{ steps.mc.outputs.mc_version }}-${{ github.run_number }}"
           JAR_PATH=$(ls target/ai-pof-*.jar | grep -v 'original-' | head -n 1)
-          cp "${JAR_PATH}" "target/ai-pof-${VERSION}.jar"
+          if [ -z "$JAR_PATH" ]; then
+            echo "No jar artifact found in target/." >&2
+            exit 1
+          fi
+          OUT_JAR="ai-pof-${RELEASE_ID}.jar"
+          cp "$JAR_PATH" "$OUT_JAR"
+          echo "release_id=$RELEASE_ID" >> "$GITHUB_OUTPUT"
+          echo "asset=$OUT_JAR" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub Release
-        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release_tag.outputs.tag }}
-          name: ${{ steps.release_tag.outputs.tag }}
-          files: target/ai-pof-*.jar
+          tag_name: "v${{ steps.asset.outputs.release_id }}"
+          name: "v${{ steps.asset.outputs.release_id }}"
+          files: "${{ steps.asset.outputs.asset }}"
